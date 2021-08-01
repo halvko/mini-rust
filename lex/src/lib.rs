@@ -3,6 +3,35 @@ use std::convert::TryFrom;
 #[cfg(test)]
 mod tests;
 
+/*
+fn pos_iter<'a>(s: &'a str) -> impl Iterator<Item = (char, Pos)> + 'a {
+    PosIter {
+        iter: s.chars(),
+        pos: Pos { line: 0, column: 0 },
+    }
+}
+
+pub struct PosIter<I> {
+    iter: I,
+    pos: Pos,
+}
+
+impl<I: Iterator<Item = char>> Iterator for PosIter<I> {
+    type Item = (char, Pos);
+    fn next(&mut self) -> Option<Self::Item> {
+        let c = self.iter.next()?;
+        let pos = self.pos.clone();
+        if c == '\n' {
+            self.pos.line += 1;
+            self.pos.column = 0;
+        } else {
+            self.pos.column += 1;
+        }
+        Some((c, pos))
+    }
+}
+*/
+
 pub struct TokenStream<'a> {
     input: &'a str,
     index: usize,
@@ -19,10 +48,14 @@ pub enum Token<'a> {
     Colon,
     Semi,
     Comma,
-    Arrow,
+    Dot,
     Minus,
+    Plus,
     Eq,
+    Arrow,
     Ident(&'a str),
+    Int(&'a str),
+    Float(&'a str),
     Error,
 }
 
@@ -50,24 +83,13 @@ impl TryFrom<&str> for KeyWord {
     }
 }
 
-#[derive(Debug)]
-enum State {
-    // The empty state - nothing have been parsed yet
-    Empty,
-    // We have encountered whitespace, and are gonna parse until something else is encountered
-    WhiteSpace,
-    // We have encountered something that may either be an identifier or a keyword
-    KeyOrIdent,
-    MinusOrArrow,
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pos {
     pub line: usize,
     pub column: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Span {
     pub start: Pos,
     pub end: Pos,
@@ -100,6 +122,21 @@ pub struct Span {
     }
 }*/
 
+#[derive(Debug)]
+enum State {
+    // The empty state - nothing have been parsed yet
+    Empty,
+    // We have encountered whitespace, and are gonna parse until something else is encountered
+    WhiteSpace,
+    // We have encountered something that may either be an identifier or a keyword
+    KeyOrIdent,
+    MinusOrArrow,
+    IntOrFloat,
+    OptionFloat,
+    Float,
+    Int,
+}
+
 impl<'a> Iterator for TokenStream<'a> {
     type Item = (Token<'a>, Span);
 
@@ -108,101 +145,292 @@ impl<'a> Iterator for TokenStream<'a> {
         let mut indecies = input.char_indices();
         let mut state = State::Empty;
         let mut token_str = &input[..0];
-        let mut span = Span {
-            start: self.pos,
-            end: self.pos,
-        };
+        let start = self.pos;
 
         while let Some((p, c)) = indecies.next() {
-            if c == '\n' {
-                span.end.line += 1;
-                span.end.column = 0;
-            } else {
-                span.end.column += 1;
-            }
             match state {
                 State::Empty => match c {
                     'a'..='z' | 'A'..='Z' | '_' => state = State::KeyOrIdent,
+                    '0'..='9' => state = State::IntOrFloat,
                     '(' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Bracket(Bracket::Start), span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Bracket(Bracket::Start),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     ')' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Bracket(Bracket::End), span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Bracket(Bracket::End),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     '[' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Square(Bracket::Start), span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Square(Bracket::Start),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     ']' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Square(Bracket::End), span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Square(Bracket::End),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     '{' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Curley(Bracket::Start), span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Curley(Bracket::Start),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     '}' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Curley(Bracket::End), span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Curley(Bracket::End),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     ':' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Colon, span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Colon,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     ';' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Semi, span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Semi,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     ',' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Comma, span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Comma,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     '=' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Eq, span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Eq,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
+                    }
+                    '+' => {
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Plus,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     '-' => {
                         state = State::MinusOrArrow;
                     }
+                    '.' => {
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Dot,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
+                    }
                     c if c.is_whitespace() => state = State::WhiteSpace,
                     c => {
                         let skip_bytes = c.len_utf8();
-                        self.index = self.index + p + skip_bytes;
-                        return Some((Token::Error, span));
+                        self.index += p + skip_bytes;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Error,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                 },
                 State::WhiteSpace => {
                     if c.is_whitespace() {
                     } else {
-                        self.index = self.index + p;
-                        return Some((Token::WhiteSpace, span));
+                        self.index += p;
+                        return Some((
+                            Token::WhiteSpace,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                 }
                 State::KeyOrIdent => match c {
                     'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => {}
                     _ => {
-                        self.index = self.index + p;
+                        self.index += p;
                         if let Ok(k) = KeyWord::try_from(token_str) {
-                            return Some((Token::KeyWord(k), span));
+                            return Some((
+                                Token::KeyWord(k),
+                                Span {
+                                    start,
+                                    end: self.pos,
+                                },
+                            ));
                         } else {
-                            return Some((Token::Ident(token_str), span));
+                            return Some((
+                                Token::Ident(token_str),
+                                Span {
+                                    start,
+                                    end: self.pos,
+                                },
+                            ));
                         }
                     }
                 },
                 State::MinusOrArrow => match c {
                     '>' => {
-                        self.index = self.index + p + 1;
-                        return Some((Token::Arrow, span));
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return Some((
+                            Token::Arrow,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
                     }
                     _ => {
-                        self.index = self.index + p;
-                        return Some((Token::Minus, span));
+                        self.index += p;
+                        return Some((
+                            Token::Minus,
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
+                    }
+                },
+                State::IntOrFloat => match c {
+                    '0'..='9' | '_' => {}
+                    'a'..='z' | 'A'..='Z' => state = State::Int,
+                    '.' => state = State::OptionFloat,
+                    _ => {
+                        self.index += p;
+                        return Some((
+                            Token::Int(token_str),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
+                    }
+                },
+                State::Int => match c {
+                    'a'..='z' | 'A'..='Z' | '0'..='9' | '_' => {}
+                    _ => {
+                        self.index += p;
+                        return Some((
+                            Token::Int(token_str),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
+                    }
+                },
+                State::OptionFloat => match c {
+                    '0'..='9' => state = State::Float,
+                    'a'..='z' | 'A'..='Z' | '_' => {
+                        self.index += p - 1;
+                        self.pos.column -= 1;
+                        return Some((
+                            Token::Int(&token_str[..token_str.len() - 1]),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ));
+                    }
+                    _ => {
+                        return Some((
+                            Token::Float(token_str),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ))
+                    }
+                },
+                State::Float => match c {
+                    '0'..='9' | 'a'..='z' | 'A'..='Z' | '_' => {}
+                    _ => {
+                        return Some((
+                            Token::Float(token_str),
+                            Span {
+                                start,
+                                end: self.pos,
+                            },
+                        ))
                     }
                 },
             }
-            token_str = &input[..=p]
+            token_str = &input[..=p];
+            if c == '\n' {
+                self.pos.line += 1;
+                self.pos.column = 0;
+            } else {
+                self.pos.column += 1;
+            }
         }
 
         // No characters were left in the string
@@ -211,13 +439,51 @@ impl<'a> Iterator for TokenStream<'a> {
             State::Empty => None,
             State::KeyOrIdent => {
                 if let Ok(k) = KeyWord::try_from(token_str) {
-                    Some((Token::KeyWord(k), span))
+                    Some((
+                        Token::KeyWord(k),
+                        Span {
+                            start,
+                            end: self.pos,
+                        },
+                    ))
                 } else {
-                    Some((Token::Ident(token_str), span))
+                    Some((
+                        Token::Ident(token_str),
+                        Span {
+                            start,
+                            end: self.pos,
+                        },
+                    ))
                 }
             }
-            State::WhiteSpace => Some((Token::WhiteSpace, span)),
-            State::MinusOrArrow => Some((Token::Minus, span)),
+            State::WhiteSpace => Some((
+                Token::WhiteSpace,
+                Span {
+                    start,
+                    end: self.pos,
+                },
+            )),
+            State::MinusOrArrow => Some((
+                Token::Minus,
+                Span {
+                    start,
+                    end: self.pos,
+                },
+            )),
+            State::IntOrFloat | State::Int => Some((
+                Token::Int(token_str),
+                Span {
+                    start,
+                    end: self.pos,
+                },
+            )),
+            State::OptionFloat | State::Float => Some((
+                Token::Float(token_str),
+                Span {
+                    start,
+                    end: self.pos,
+                },
+            )),
         }
     }
 }
@@ -226,6 +492,6 @@ pub fn lex(input: &str) -> TokenStream {
     TokenStream {
         input,
         index: 0,
-        pos: Pos { line: 0, column: 0 },
+        pos: Pos { line: 1, column: 0 },
     }
 }
