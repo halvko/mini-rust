@@ -89,10 +89,19 @@ pub struct Pos {
     pub column: usize,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub start: Pos,
     pub end: Pos,
+}
+
+impl Span {
+    pub fn new() -> Self {
+        Span {
+            start: Pos { line: 1, column: 0 },
+            end: Pos { line: 1, column: 0 },
+        }
+    }
 }
 
 /*impl<'a> TokenStream<'a> {
