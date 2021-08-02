@@ -1,10 +1,10 @@
-mod complex;
 mod composites;
 mod floats;
 mod integers;
 mod keywords;
 mod operators;
 mod seperators;
+mod string_literals;
 
 fn update_span(span: &mut Span, len: usize, height: usize) -> Span {
     let start = span.end;

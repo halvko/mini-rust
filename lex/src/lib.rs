@@ -1,7 +1,7 @@
-use std::convert::TryFrom;
+use std::{borrow::Cow, convert::TryFrom};
 
 #[cfg(test)]
-mod tests;
+mod test;
 
 /*
 fn pos_iter<'a>(s: &'a str) -> impl Iterator<Item = (char, Pos)> + 'a {
@@ -54,6 +54,7 @@ pub enum Token<'a> {
     Eq,
     Arrow,
     Ident(&'a str),
+    StringLiteral(Cow<'a, str>),
     Int(&'a str),
     Float(&'a str),
     Error,
@@ -142,6 +143,8 @@ enum State {
     MinusOrArrow,
     IntOrFloat,
     OptionFloat,
+    StringLiteral,
+    StringLiteralEscaped,
     Float,
     Int,
 }
@@ -296,6 +299,9 @@ impl<'a> Iterator for TokenStream<'a> {
                             },
                         ));
                     }
+                    '"' => {
+                        state = State::StringLiteral;
+                    }
                     c if c.is_whitespace() => state = State::WhiteSpace,
                     c => {
                         let skip_bytes = c.len_utf8();
@@ -432,7 +438,35 @@ impl<'a> Iterator for TokenStream<'a> {
                         ))
                     }
                 },
+                State::StringLiteral => match c {
+                    '"' => {
+                        self.index += p + 1;
+                        self.pos.column += 1;
+                        return match unescape_string(Cow::Borrowed(&token_str[1..])) {
+                            Some(s) => Some((
+                                Token::StringLiteral(s),
+                                Span {
+                                    start,
+                                    end: self.pos,
+                                },
+                            )),
+                            None => Some((
+                                Token::Error,
+                                Span {
+                                    start,
+                                    end: self.pos,
+                                },
+                            )),
+                        };
+                    }
+                    '\\' => state = State::StringLiteralEscaped,
+                    _ => {}
+                },
+                State::StringLiteralEscaped => match c {
+                    _ => state = State::StringLiteral,
+                },
             }
+
             token_str = &input[..=p];
             if c == '\n' {
                 self.pos.line += 1;
@@ -493,7 +527,36 @@ impl<'a> Iterator for TokenStream<'a> {
                     end: self.pos,
                 },
             )),
+            State::StringLiteral | State::StringLiteralEscaped => Some((
+                Token::Error,
+                Span {
+                    start,
+                    end: self.pos,
+                },
+            )),
         }
+    }
+}
+
+fn unescape_string(s: Cow<'_, str>) -> Option<Cow<'_, str>> {
+    if !s.contains("\\") {
+        Some(s)
+    } else {
+        let mut ret = String::new();
+        let mut escaped = false;
+        for c in s.chars() {
+            if escaped {
+                match c {
+                    '\\' => ret.push('\\'),
+                    'n' => ret.push('\n'),
+                    'r' => ret.push('\r'),
+                    't' => ret.push('\t'),
+                    _ => return None,
+                }
+                escaped = false
+            }
+        }
+        Some(Cow::Owned(ret))
     }
 }
 
