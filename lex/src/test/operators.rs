@@ -32,6 +32,7 @@ fn plus() {
     )
 }
 
+#[test]
 fn eq() {
     let input = "=";
     let lexed = lex(input).collect::<Vec<_>>();

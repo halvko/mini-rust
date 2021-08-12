@@ -5,7 +5,7 @@ use crate::*;
 fn fn_def() {
     let input = "fn lul(){}";
     let mut lexed = lex(input);
-    let mut span = &mut Span::new();
+    let span = &mut Span::new();
     assert_eq!(
         Some((Token::KeyWord(KeyWord::Fn), update_span(span, 2, 0))),
         lexed.next()
@@ -41,7 +41,7 @@ fn fn_def() {
 fn fn_with_args() {
     let input = "fn lul(a: u16, b: String){}";
     let mut lexed = lex(input);
-    let mut span = &mut Span::new();
+    let span = &mut Span::new();
     assert_eq!(
         Some((Token::KeyWord(KeyWord::Fn), update_span(span, 2, 0))),
         lexed.next()
@@ -165,7 +165,7 @@ fn fn_with_return() {
 fn let_decl() {
     let input = "let a = b;";
     let mut lexed = lex(input);
-    let mut span = &mut Span::new();
+    let span = &mut Span::new();
     assert_eq!(
         Some((Token::KeyWord(KeyWord::Let), update_span(span, 3, 0))),
         lexed.next()

@@ -21,13 +21,22 @@ fn typed_int() {
     let input = "123u32";
     let lexed = lex(input).collect::<Vec<_>>();
     assert_eq!(
-        vec!((
-            Token::Int("123u32"),
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 1, column: 6 }
-            }
-        )),
+        vec!(
+            (
+                Token::Int("123"),
+                Span {
+                    start: Pos { line: 1, column: 0 },
+                    end: Pos { line: 1, column: 3 }
+                }
+            ),
+            (
+                Token::Ident("u32"),
+                Span {
+                    start: Pos { line: 1, column: 3 },
+                    end: Pos { line: 1, column: 6 }
+                }
+            )
+        ),
         lexed
     )
 }

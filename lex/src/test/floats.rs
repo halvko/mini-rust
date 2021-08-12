@@ -21,16 +21,25 @@ fn typed_float() {
     let input = "123.123f32";
     let lexed = lex(input).collect::<Vec<_>>();
     assert_eq!(
-        vec!((
-            Token::Float("123.123f32"),
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos {
-                    line: 1,
-                    column: 10
+        vec!(
+            (
+                Token::Float("123.123"),
+                Span {
+                    start: Pos { line: 1, column: 0 },
+                    end: Pos { line: 1, column: 7 }
                 }
-            }
-        )),
+            ),
+            (
+                Token::Ident("f32"),
+                Span {
+                    start: Pos { line: 1, column: 7 },
+                    end: Pos {
+                        line: 1,
+                        column: 10
+                    }
+                }
+            )
+        ),
         lexed
     )
 }

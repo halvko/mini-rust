@@ -3,9 +3,9 @@ use crate::*;
 
 #[test]
 fn empty() {
-    let input = "";
+    let input = "\"\"";
     let mut lexed = lex(input);
-    let mut span = &mut Span::new();
+    let span = &mut Span::new();
     assert_eq!(
         Some((
             Token::StringLiteral(Cow::Borrowed("")),

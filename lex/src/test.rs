@@ -19,6 +19,7 @@ fn update_span(span: &mut Span, len: usize, height: usize) -> Span {
 
 use crate::*;
 
+#[test]
 fn whitespace() {
     let input = " ";
     let lexed = lex(input).collect::<Vec<_>>();
@@ -34,6 +35,7 @@ fn whitespace() {
     )
 }
 
+#[test]
 fn newline() {
     let input = "\n";
     let lexed = lex(input).collect::<Vec<_>>();
@@ -49,6 +51,7 @@ fn newline() {
     )
 }
 
+#[test]
 fn multiple_whitespace() {
     let input = " \n ";
     let lexed = lex(input).collect::<Vec<_>>();
