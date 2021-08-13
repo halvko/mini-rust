@@ -90,6 +90,12 @@ pub struct Pos {
     pub column: usize,
 }
 
+impl Pos {
+    pub fn new() -> Self {
+        Pos { line: 1, column: 0 }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub start: Pos,
@@ -99,8 +105,8 @@ pub struct Span {
 impl Span {
     pub fn new() -> Self {
         Span {
-            start: Pos { line: 1, column: 0 },
-            end: Pos { line: 1, column: 0 },
+            start: Pos::new(),
+            end: Pos::new(),
         }
     }
 }
@@ -317,6 +323,6 @@ pub fn lex(input: &str) -> TokenStream {
     TokenStream {
         input,
         index: 0,
-        pos: Pos { line: 1, column: 0 },
+        pos: Pos::new(),
     }
 }

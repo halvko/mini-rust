@@ -6,143 +6,83 @@ mod operators;
 mod seperators;
 mod string_literals;
 
-fn update_span(span: &mut Span, len: usize, height: usize) -> Span {
-    let start = span.end;
-    let end = Pos {
-        line: start.line + height,
-        column: start.column + len,
-    };
-    span.start = start;
-    span.end = end;
-    span.clone()
+impl Pos {
+    fn update(self: &mut Pos, len: usize) -> Span {
+        let start = *self;
+        self.column += len;
+        Span { start, end: *self }
+    }
+
+    fn update_ln(self: &mut Pos, height: usize, column: usize) -> Span {
+        let start = *self;
+        let end = Pos {
+            line: start.line + height,
+            column,
+        };
+        *self = end;
+        Span { start, end }
+    }
 }
 
-use crate::*;
+fn lex_test(input: &str, expected: &[(Token, Span)]) {
+    let lexed = lex(input).take(expected.len() + 1).collect::<Vec<_>>();
+    assert_eq!(expected, &lexed[0..usize::min(lexed.len(), expected.len())]);
+    assert_eq!(None, lexed.get(expected.len()));
+}
+
+mod prelude {
+    pub(super) use super::lex_test;
+    pub use crate::*;
+    pub use Token::*;
+}
+use prelude::*;
 
 #[test]
 fn whitespace() {
-    let input = " ";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec![(
-            Token::WhiteSpace,
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 1, column: 1 }
-            }
-        )],
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test(" ", &[(WhiteSpace, pos.update(1))]);
 }
 
 #[test]
 fn newline() {
-    let input = "\n";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec![(
-            Token::WhiteSpace,
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 2, column: 0 }
-            }
-        )],
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test("\n", &[(WhiteSpace, pos.update_ln(1, 0))]);
 }
 
 #[test]
 fn multiple_whitespace() {
-    let input = " \n ";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec![(
-            Token::WhiteSpace,
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 2, column: 1 }
-            }
-        )],
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test(" \n ", &[(WhiteSpace, pos.update_ln(1, 1))]);
 }
 
 #[test]
 fn lex_ident() {
-    let input = "saoecri";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec![(
-            Token::Ident("saoecri"),
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 1, column: 7 }
-            }
-        )],
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test("saoecri", &[(Ident("saoecri"), pos.update(7))]);
 }
 
 #[test]
 fn lex_two_fn() {
-    let input = "fn fn";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec![
-            (
-                Token::KeyWord(KeyWord::Fn),
-                Span {
-                    start: Pos { line: 1, column: 0 },
-                    end: Pos { line: 1, column: 2 }
-                }
-            ),
-            (
-                Token::WhiteSpace,
-                Span {
-                    start: Pos { line: 1, column: 2 },
-                    end: Pos { line: 1, column: 3 }
-                }
-            ),
-            (
-                Token::KeyWord(KeyWord::Fn),
-                Span {
-                    start: Pos { line: 1, column: 3 },
-                    end: Pos { line: 1, column: 5 }
-                }
-            )
+    let pos = &mut Pos::new();
+    lex_test(
+        "fn fn",
+        &[
+            (KeyWord(KeyWord::Fn), pos.update(2)),
+            (WhiteSpace, pos.update(1)),
+            (KeyWord(KeyWord::Fn), pos.update(2)),
         ],
-        lexed
-    )
+    );
 }
 
 #[test]
 fn lex_two_idents() {
-    let input = "fna fni";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec![
-            (
-                Token::Ident("fna"),
-                Span {
-                    start: Pos { line: 1, column: 0 },
-                    end: Pos { line: 1, column: 3 }
-                }
-            ),
-            (
-                Token::WhiteSpace,
-                Span {
-                    start: Pos { line: 1, column: 3 },
-                    end: Pos { line: 1, column: 4 }
-                }
-            ),
-            (
-                Token::Ident("fni"),
-                Span {
-                    start: Pos { line: 1, column: 4 },
-                    end: Pos { line: 1, column: 7 }
-                }
-            ),
+    let pos = &mut Pos::new();
+    lex_test(
+        "fna fni",
+        &[
+            (Ident("fna"), pos.update(3)),
+            (WhiteSpace, pos.update(1)),
+            (Ident("fni"), pos.update(3)),
         ],
-        lexed
-    )
+    );
 }

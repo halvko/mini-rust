@@ -1,58 +1,25 @@
-use crate::*;
+use super::prelude::*;
 
 #[test]
 fn int() {
-    let input = "123";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec!((
-            Token::Int("123"),
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 1, column: 3 }
-            }
-        )),
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test("123", &[(Token::Int("123"), pos.update(3))]);
 }
 
 #[test]
 fn typed_int() {
-    let input = "123u32";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec!(
-            (
-                Token::Int("123"),
-                Span {
-                    start: Pos { line: 1, column: 0 },
-                    end: Pos { line: 1, column: 3 }
-                }
-            ),
-            (
-                Token::Ident("u32"),
-                Span {
-                    start: Pos { line: 1, column: 3 },
-                    end: Pos { line: 1, column: 6 }
-                }
-            )
-        ),
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test(
+        "123u32",
+        &[
+            (Token::Int("123"), pos.update(3)),
+            (Token::Ident("u32"), pos.update(3)),
+        ],
+    );
 }
 
 #[test]
 fn int_with_seperator() {
-    let input = "123_000";
-    let lexed = lex(input).collect::<Vec<_>>();
-    assert_eq!(
-        vec!((
-            Token::Int("123_000"),
-            Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 1, column: 7 }
-            }
-        )),
-        lexed
-    )
+    let pos = &mut Pos::new();
+    lex_test("123_000", &[(Token::Int("123_000"), pos.update(7))]);
 }
