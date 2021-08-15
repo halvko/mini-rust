@@ -2,36 +2,6 @@ use std::{borrow::Cow, convert::TryFrom};
 
 #[cfg(test)]
 mod test;
-
-/*
-fn pos_iter<'a>(s: &'a str) -> impl Iterator<Item = (char, Pos)> + 'a {
-    PosIter {
-        iter: s.chars(),
-        pos: Pos { line: 0, column: 0 },
-    }
-}
-
-pub struct PosIter<I> {
-    iter: I,
-    pos: Pos,
-}
-
-impl<I: Iterator<Item = char>> Iterator for PosIter<I> {
-    type Item = (char, Pos);
-    fn next(&mut self) -> Option<Self::Item> {
-        let c = self.iter.next()?;
-        let pos = self.pos.clone();
-        if c == '\n' {
-            self.pos.line += 1;
-            self.pos.column = 0;
-        } else {
-            self.pos.column += 1;
-        }
-        Some((c, pos))
-    }
-}
-*/
-
 pub struct TokenStream<'a> {
     input: &'a str,
     index: usize,
@@ -110,33 +80,6 @@ impl Span {
         }
     }
 }
-
-/*impl<'a> TokenStream<'a> {
-    fn next_token(&mut self) -> Option<<Self as Iterator>::Item> {
-        let input = &self.input[self.index..];
-        let mut indecies = input.char_indices();
-        let (p, c) = indecies.next()?;
-        match c {
-            'a'..='z' | 'A'..='Z' | '_' => {
-                let (q, id) = match indecies
-                    .skip_while(|(_, c)| {
-                        if let 'a'..='z' | 'A'..='Z' | '0'..='9' | '_' = c {
-                            true
-                        } else {
-                            false
-                        }
-                    })
-                    .next()
-                {
-                    Some((q, _)) => (q, &input[p..p + q]),
-                    None => (input.len() - p, &input[p..]),
-                };
-                Some((Token::Ident(id), unimplemented!(q)))
-            }
-            _ => unimplemented!(),
-        }
-    }
-}*/
 
 #[derive(Debug)]
 enum State<'a> {
