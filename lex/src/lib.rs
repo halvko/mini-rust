@@ -201,7 +201,7 @@ impl<'a> State<'a> {
             Float => (
                 Float,
                 match c {
-                    '0'..='9' => None,
+                    '0'..='9' | '_' => None,
                     _ => Some(1),
                 },
             ),

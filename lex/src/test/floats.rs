@@ -29,6 +29,18 @@ fn typed_float() {
 }
 
 #[test]
+fn typed_float_with_sep() {
+    let pos = &mut Pos::new();
+    lex_test(
+        "999.999_f32",
+        &[
+            (Token::Float("999.999_"), pos.update(8)),
+            (Token::Ident("f32"), pos.update(3)),
+        ],
+    )
+}
+
+#[test]
 fn float_with_seperator() {
     let pos = &mut Pos::new();
     lex_test("1_230.123", &[(Token::Float("1_230.123"), pos.update(9))]);
