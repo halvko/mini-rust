@@ -1,17 +1,7 @@
-use crate::test::update_span;
-use crate::*;
+use super::prelude::*;
 
 #[test]
 fn empty() {
-    let input = "\"\"";
-    let mut lexed = lex(input);
-    let span = &mut Span::new();
-    assert_eq!(
-        Some((
-            Token::StringLiteral(Cow::Borrowed("")),
-            update_span(span, 2, 0)
-        )),
-        lexed.next()
-    );
-    assert_eq!(None, lexed.next());
+    let pos = &mut Pos::new();
+    lex_test("\"\"", &[(StringLiteral(Cow::Borrowed("")), pos.update(2))]);
 }
