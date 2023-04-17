@@ -67,19 +67,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3304a64d199bb964be99741b7a14d26972741915b3649639149b2479bb46f4b5"
 
 [[package]]
-name = "mini-lex"
-version = "0.1.0"
-
-[[package]]
-name = "mini-rust"
-version = "0.1.0"
-dependencies = [
- "lex",
- "mini-lex",
- "parse",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

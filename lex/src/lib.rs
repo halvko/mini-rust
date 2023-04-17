@@ -58,11 +58,16 @@ impl TryFrom<&str> for KeyWord {
 pub struct Pos {
     pub line: usize,
     pub column: usize,
+    pub offset: usize,
 }
 
 impl Pos {
     pub fn new() -> Self {
-        Pos { line: 1, column: 0 }
+        Pos {
+            line: 1,
+            column: 0,
+            offset: 0,
+        }
     }
 }
 
@@ -116,6 +121,7 @@ impl<'a> Iterator for TokenStream<'a> {
             } else {
                 self.pos.column += 1;
             }
+            self.pos.offset += 1;
 
             let (s, done) = state.next(c);
             state = s;
@@ -125,6 +131,7 @@ impl<'a> Iterator for TokenStream<'a> {
                 self.pos = Pos {
                     line: self.pos.line,
                     column: self.pos.column - i,
+                    offset: self.pos.offset - i,
                 };
                 let token = state.token(&input[0..p - i])?;
                 let span = Span {

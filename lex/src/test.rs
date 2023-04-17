@@ -10,14 +10,16 @@ impl Pos {
     fn update(self: &mut Pos, len: usize) -> Span {
         let start = *self;
         self.column += len;
+        self.offset += len;
         Span { start, end: *self }
     }
 
-    fn update_ln(self: &mut Pos, height: usize, column: usize) -> Span {
+    fn update_ln(self: &mut Pos, lines: usize, column: usize, offset: usize) -> Span {
         let start = *self;
         let end = Pos {
-            line: start.line + height,
+            line: start.line + lines,
             column,
+            offset: start.offset + offset,
         };
         *self = end;
         Span { start, end }
@@ -26,7 +28,7 @@ impl Pos {
 
 fn lex_test(input: &str, expected: &[(Token, Span)]) {
     let lexed = lex(input).take(expected.len() + 1).collect::<Vec<_>>();
-    assert_eq!(expected, &lexed[0..usize::min(lexed.len(), expected.len())]);
+    assert_eq!(expected, &lexed);
     assert_eq!(None, lexed.get(expected.len()));
 }
 
@@ -46,13 +48,13 @@ fn whitespace() {
 #[test]
 fn newline() {
     let pos = &mut Pos::new();
-    lex_test("\n", &[(WhiteSpace, pos.update_ln(1, 0))]);
+    lex_test("\n", &[(WhiteSpace, pos.update_ln(1, 0, 1))]);
 }
 
 #[test]
 fn multiple_whitespace() {
     let pos = &mut Pos::new();
-    lex_test(" \n ", &[(WhiteSpace, pos.update_ln(1, 1))]);
+    lex_test(" \n ", &[(WhiteSpace, pos.update_ln(1, 1, 3))]);
 }
 
 #[test]

@@ -1,0 +1,37 @@
+program       =  { SOI ~ inner_program ~ EOI }
+inner_program =  { fn* }
+fn            =  { "fn" ~ ident ~ arg_list ~ fn_ret ~ block }
+fn_ret        =  { ("->" ~ type)? }
+arg_list      =  { "(" ~ (arg ~ ",")* ~ arg? ~ ")" }
+arg           =  { ident ~ ":" ~ type }
+block         =  { "{" ~ stmts ~ expr? ~ "}" }
+stmts         =  { (stmt? ~ ";")* }
+stmt          =  { let_stmt | expr }
+let_stmt      =  { "let" ~ let_mut ~ ident ~ let_type ~ "=" ~ expr }
+let_mut       =  { "mut"? }
+let_type      =  { (":" ~ type)? }
+expr          =  { s_expr ~ (infix ~ s_expr)? }
+s_expr        =  { if | "(" ~ expr ~ ")" | block | ident | value }
+type          =  { ident }
+if            =  { "if" ~ expr ~ block ~ else }
+else          =  { ("else" ~ block)? }
+value         =  { int }
+int           = @{ "-"? ~ numric+ }
+infix         =  { add | sub | mul | div | mod | eq | neq | lt | gt | lte | gte | assign }
+add           =  { "+" }
+sub           =  { "-" }
+mul           =  { "*" }
+div           =  { "/" }
+mod           =  { "%" }
+eq            =  { "==" }
+neq           =  { "!=" }
+lt            =  { "<" }
+gt            =  { ">" }
+lte           =  { "<=" }
+gte           =  { ">=" }
+assign        =  { "=" }
+ident         = @{ alpha ~ alpha_numric* }
+alpha         =  { 'a'..'z' | 'A'..'Z' }
+alpha_numric  =  { alpha | numric }
+numric        =  { '0'..'9' }
+WHITESPACE    = _{ "\t" | " " | NEWLINE }

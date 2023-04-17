@@ -8,8 +8,16 @@ fn float() {
         vec!((
             Token::Float("123.123"),
             Span {
-                start: Pos { line: 1, column: 0 },
-                end: Pos { line: 1, column: 7 }
+                start: Pos {
+                    line: 1,
+                    column: 0,
+                    offset: 0
+                },
+                end: Pos {
+                    line: 1,
+                    column: 7,
+                    offset: 7
+                }
             }
         )),
         lexed
