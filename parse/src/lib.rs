@@ -9,13 +9,14 @@ const KEYWORDS: [&str; 3] = ["fn", "let", "mut"];
 #[grammar = "./grammar.pest"]
 struct Grammar;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct AbstractSyntaxTree {
     pub globals: HashMap<Ident, function::Function>,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Debug)]
 pub struct Ident {
-    inner: String,
+    pub inner: String,
 }
 
 impl std::fmt::Display for Ident {
@@ -24,7 +25,7 @@ impl std::fmt::Display for Ident {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub start: Position,
     pub end: Position,
@@ -39,7 +40,7 @@ impl<'a> From<pest::Span<'a>> for Span {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Position {
     pub byte: usize,
     pub line: usize,
@@ -56,9 +57,9 @@ impl<'a> From<pest::Position<'a>> for Position {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Type {
-    name: Ident,
+    pub name: Ident,
 }
 
 impl Type {
@@ -67,10 +68,12 @@ impl Type {
     }
 }
 
+#[derive(Debug)]
 pub enum ASTGenError {
     GlobalNameCollision(GlobalNameCollision),
 }
 
+#[derive(Debug)]
 pub struct GlobalNameCollision {
     pub path: Ident,
     pub locs: (Position, Position),
@@ -119,16 +122,15 @@ fn parse_type(r#type: Pair<Rule>) -> Type {
 
 fn parse_ident(ident: Pair<Rule>) -> Ident {
     debug_assert_eq!(ident.as_rule(), Rule::ident);
-    let inner = ident.into_inner().next().unwrap();
-    if KEYWORDS.contains(&inner.as_str()) {
+    if KEYWORDS.contains(&ident.as_str()) {
         panic!(
             "Use of keyword \"{}\" as identifier, on line {}",
-            inner.as_str(),
-            inner.as_span().start_pos().line_col().0
+            ident.as_str(),
+            ident.as_span().start_pos().line_col().0
         );
     }
     Ident {
-        inner: inner.as_str().to_string(),
+        inner: ident.as_str().to_owned(),
     }
 }
 
@@ -136,11 +138,13 @@ pub mod expression {
     use super::*;
     use pest::iterators::Pair;
 
+    #[derive(Debug, PartialEq, Eq)]
     pub struct Block {
         pub stmts: Vec<Statement>,
         pub expr: Option<Expression>,
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     pub enum Statement {
         Let {
             ident: String,
@@ -152,6 +156,7 @@ pub mod expression {
     }
 
     // FUTURE: Use arena references rather than boxes
+    #[derive(Debug, PartialEq, Eq)]
     pub enum Expression {
         IfExp {
             cond: Box<Expression>,
@@ -164,10 +169,12 @@ pub mod expression {
         BinExp(Box<Expression>, Infix, Box<Expression>),
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     pub enum Value {
         Int(String),
     }
 
+    #[derive(Debug, PartialEq, Eq)]
     pub enum Infix {
         Add,
         Sub,
@@ -204,7 +211,7 @@ pub mod expression {
         debug_assert_eq!(let_stmt.as_rule(), Rule::let_stmt);
         let mut let_stmt = let_stmt.into_inner();
         let r#mut = !let_stmt.next().unwrap().as_str().is_empty();
-        let ident = let_stmt.next().unwrap().as_str().to_string();
+        let ident = let_stmt.next().unwrap().as_str().to_owned();
         let r#type = parse_let_type(let_stmt.next().unwrap());
         let expr = parse_expr(let_stmt.next().unwrap());
         Statement::Let {
@@ -217,7 +224,7 @@ pub mod expression {
 
     fn parse_let_type(let_type: Pair<Rule>) -> Option<Type> {
         debug_assert_eq!(let_type.as_rule(), Rule::let_type);
-        let_type.into_inner().next().map(|r| parse_type(r))
+        let_type.into_inner().next().map(parse_type)
     }
 
     fn parse_stmt(stmt: Pair<Rule>) -> Statement {
@@ -280,7 +287,7 @@ pub mod expression {
         let mut if_expr = r#if.into_inner();
         let cond = Box::new(parse_expr(if_expr.next().unwrap()));
         let block = Box::new(parse_block(if_expr.next().unwrap()));
-        let r#else = parse_else(if_expr.next().unwrap()).map(|block| Box::new(block));
+        let r#else = parse_else(if_expr.next().unwrap()).map(Box::new);
         Expression::IfExp {
             cond,
             block,
@@ -290,14 +297,14 @@ pub mod expression {
 
     fn parse_else(r#else: Pair<Rule>) -> Option<Block> {
         debug_assert_eq!(r#else.as_rule(), Rule::r#else);
-        r#else.into_inner().next().map(|block| parse_block(block))
+        r#else.into_inner().next().map(parse_block)
     }
 
     fn parse_value(value: Pair<Rule>) -> Value {
         debug_assert_eq!(value.as_rule(), Rule::value);
         let value = value.into_inner().next().unwrap();
         match value.as_rule() {
-            Rule::int => Value::Int(value.as_str().to_string()),
+            Rule::int => Value::Int(value.as_str().to_owned()),
             _ => unreachable!(),
         }
     }
@@ -308,6 +315,7 @@ pub mod function {
     use expression::Block;
     use pest::iterators::Pair;
 
+    #[derive(Debug, PartialEq, Eq)]
     pub struct Function {
         pub args: Vec<(Ident, Type)>,
         pub ret_type: Type,
@@ -320,7 +328,7 @@ pub mod function {
         let span: Span = function.as_span().into();
         let mut tokens = function.into_inner();
         let path = Ident {
-            inner: tokens.next().unwrap().to_string(),
+            inner: tokens.next().unwrap().as_str().to_owned(),
         };
         let args = parse_fn_args(tokens.next().unwrap());
         let ret_type = parse_fn_ret_type(tokens.next().unwrap());
@@ -362,7 +370,7 @@ pub mod function {
             // FUTURE: Add support for (empty) product type
             Type {
                 name: Ident {
-                    inner: "void".to_string(),
+                    inner: "void".to_owned(),
                 },
             }
         }
