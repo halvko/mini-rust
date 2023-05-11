@@ -6,7 +6,7 @@ use std::{
 use pest::{iterators::Pair, Parser};
 use pest_derive::Parser;
 
-const KEYWORDS: [&str; 3] = ["fn", "let", "mut"];
+const KEYWORDS: [&str; 5] = ["fn", "let", "mut", "loop", "break"];
 
 #[derive(Parser)]
 #[grammar = "./grammar.pest"]

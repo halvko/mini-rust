@@ -15,7 +15,7 @@ impl<T: Eq + Hash + Clone> Default for SymbolTable<T> {
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Symbol(usize);
 
 impl<T: Eq + Hash + Clone> SymbolTable<T> {
@@ -38,7 +38,7 @@ impl<T: Eq + Hash + Clone> SymbolTable<T> {
         symbol
     }
 
-    pub fn original(&self, s: Symbol) -> Option<&T> {
-        self.to_original.get(&s)
+    pub fn original(&self, s: Symbol) -> &T {
+        self.to_original.get(&s).unwrap()
     }
 }
