@@ -1,5 +1,6 @@
 use std::{collections::HashMap, hash::Hash};
 
+#[derive(Debug)]
 pub struct SymbolTable<T: Eq + Hash + Clone> {
     to_original: HashMap<Symbol, T>,
     to_symbol: HashMap<T, Symbol>,
@@ -15,7 +16,7 @@ impl<T: Eq + Hash + Clone> Default for SymbolTable<T> {
 }
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 pub struct Symbol(usize);
 
 impl<T: Eq + Hash + Clone> SymbolTable<T> {
