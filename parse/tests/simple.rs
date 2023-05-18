@@ -62,9 +62,7 @@ fn r#if() {
                 body: Block {
                     stmts: vec![],
                     expr: Some(Expression::IfExp {
-                        cond: Box::new(Expression::Ident(Ident {
-                            inner: "true".to_owned(),
-                        })),
+                        cond: Box::new(Expression::Val(Value::Bool(true))),
                         block: Box::new(Block {
                             stmts: vec![],
                             expr: None,

@@ -296,12 +296,14 @@ pub mod expression {
     #[derive(Debug, PartialEq, Eq, Clone)]
     pub enum Value {
         Int(String),
+        Bool(bool),
     }
 
     impl Display for Value {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             match self {
-                Self::Int(s) => f.write_str(s),
+                Self::Int(s) => s.fmt(f),
+                Self::Bool(b) => b.fmt(f),
             }
         }
     }
@@ -484,6 +486,11 @@ pub mod expression {
         let value = value.into_inner().next().unwrap();
         match value.as_rule() {
             Rule::int => Value::Int(value.as_str().to_owned()),
+            Rule::bool => Value::Bool(match value.as_str() {
+                "true" => true,
+                "false" => false,
+                _ => unreachable!(),
+            }),
             _ => unreachable!(),
         }
     }
