@@ -204,22 +204,28 @@ fn tc_expr(
                 kind: ExpressionKind::Var { ident },
             }
         }
-        parse::expression::Expression::Val(parse::expression::Value::Int(s)) => {
-            let (val, r#type) = (|v: &str| {
-                if let Some(u) = v.strip_suffix("usize") {
-                    return (Value::USize(u.parse().unwrap()), ss.usize);
-                }
-                if let Some(i) = v.strip_suffix("isize") {
-                    return (Value::ISize(i.parse().unwrap()), ss.isize);
-                }
-                (Value::ISize(v.parse().unwrap()), ss.isize)
-            })(&s);
+        parse::expression::Expression::Val(v) => match v {
+            parse::expression::Value::Int(s) => {
+                let (val, r#type) = (|v: &str| {
+                    if let Some(u) = v.strip_suffix("usize") {
+                        return (Value::USize(u.parse().unwrap()), ss.usize);
+                    }
+                    if let Some(i) = v.strip_suffix("isize") {
+                        return (Value::ISize(i.parse().unwrap()), ss.isize);
+                    }
+                    (Value::ISize(v.parse().unwrap()), ss.isize)
+                })(&s);
 
-            Expression {
-                r#type,
-                kind: ExpressionKind::Val(val),
+                Expression {
+                    r#type,
+                    kind: ExpressionKind::Val(val),
+                }
             }
-        }
+            parse::expression::Value::Bool(b) => Expression {
+                r#type: ss.bool,
+                kind: ExpressionKind::Val(Value::Bool(b)),
+            },
+        },
         parse::expression::Expression::BinExp(lhs, ifx, rhs) => {
             let lhs = tc_expr(*lhs, symbols, ss, var_ctxt.clone(), r#loop);
             let rhs = tc_expr(*rhs, symbols, ss, var_ctxt.clone(), r#loop);
@@ -234,7 +240,13 @@ fn tc_expr(
                     (Infix::Add, lhs.r#type)
                 }
                 parse::expression::Infix::Eq => (Infix::Eq, ss.bool),
-                parse::expression::Infix::Assign => (Infix::Assign, ss.void),
+                parse::expression::Infix::Assign => {
+                    if let ExpressionKind::Var { .. } = lhs.kind {
+                        (Infix::Assign, ss.void)
+                    } else {
+                        panic!("trying to assign to general expression")
+                    }
+                }
                 _ => todo!("Properly fix operators -.-"),
             };
             Expression {
@@ -271,7 +283,8 @@ fn tc_expr(
                 kind: ExpressionKind::Break(e.map(|e| Box::new(e))),
             }
         }
-        _ => todo!("Functions"),
+        parse::expression::Expression::CallExp(_) => todo!("functions"),
+        parse::expression::Expression::Return(_) => todo!("functions"),
     }
 }
 
@@ -357,12 +370,14 @@ impl Display for Infix {
 pub enum Value {
     USize(usize),
     ISize(isize),
+    Bool(bool),
 }
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::USize(v) => write!(f, "{v}"),
-            Self::ISize(v) => write!(f, "{v}"),
+            Self::USize(v) => v.fmt(f),
+            Self::ISize(v) => v.fmt(f),
+            Self::Bool(b) => b.fmt(f),
         }
     }
 }
