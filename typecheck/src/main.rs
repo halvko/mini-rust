@@ -8,6 +8,7 @@ fn main() {
         if a == b {
             break true;
         } else {
+            print(a);
             a = (a + 1);
         }
     };
