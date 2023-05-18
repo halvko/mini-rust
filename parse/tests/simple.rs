@@ -210,9 +210,9 @@ fn nested_exps() {
                                 )),
                                 Infix::Lt,
                                 Box::new(Expression::CallExp(CallExp {
-                                    ident: Ident {
+                                    expr: Box::new(Expression::Ident(Ident {
                                         inner: "maths".to_owned(),
-                                    },
+                                    })),
                                     args: vec![
                                         Expression::Ident(Ident {
                                             inner: "a".to_owned(),

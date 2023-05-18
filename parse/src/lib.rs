@@ -274,13 +274,13 @@ pub mod expression {
 
     #[derive(Debug, PartialEq, Eq, Clone)]
     pub struct CallExp {
-        pub ident: Ident,
+        pub expr: Box<Expression>,
         pub args: Vec<Expression>,
     }
 
     impl Display for CallExp {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            self.ident.fmt(f)?;
+            self.expr.fmt(f)?;
             f.write_char('(')?;
             let mut args = self.args.iter();
             if let Some(first_arg) = args.next() {
@@ -438,9 +438,17 @@ pub mod expression {
     fn parse_call(call: Pair<Rule>) -> CallExp {
         debug_assert_eq!(call.as_rule(), Rule::call);
         let mut call = call.into_inner();
-        let ident = parse_ident(call.next().unwrap());
+        let expr = call.next().unwrap();
+        let expr = match expr.as_rule() {
+            Rule::ident => Expression::Ident(parse_ident(expr)),
+            Rule::expr => parse_expr(expr),
+            _ => unreachable!(),
+        };
         let args = parse_arg_list(call.next().unwrap());
-        CallExp { ident, args }
+        CallExp {
+            expr: Box::new(expr),
+            args,
+        }
     }
 
     fn parse_arg_list(arg_list: Pair<Rule>) -> Vec<Expression> {
