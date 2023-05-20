@@ -8,13 +8,21 @@ use parse::{AbstractSyntaxTree, Ident};
 use symbol_table::{STDisplay, Symbol};
 
 pub fn buildins(st: &mut SymbolTable, ss: &SpecialSymbols) -> VarCtxt {
-    VarCtxt::new().insert(
-        st.symbol("print".to_owned()),
-        Type::Function {
-            args: vec![ss.isize.clone()],
-            ret: Box::new(ss.void.clone()),
-        },
-    )
+    VarCtxt::new()
+        .insert(
+            st.symbol("print".to_owned()),
+            Type::Function {
+                args: vec![ss.isize.clone()],
+                ret: Box::new(ss.void.clone()),
+            },
+        )
+        .insert(
+            st.symbol("sleep".to_owned()),
+            Type::Function {
+                args: vec![ss.usize.clone()],
+                ret: Box::new(ss.void.clone()),
+            },
+        )
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
