@@ -7,7 +7,7 @@ use immutable_map::TreeMap;
 use parse::{AbstractSyntaxTree, Ident};
 use symbol_table::{STDisplay, Symbol};
 
-fn buildins(st: &mut SymbolTable, ss: &SpecialSymbols) -> VarCtxt {
+pub fn buildins(st: &mut SymbolTable, ss: &SpecialSymbols) -> VarCtxt {
     VarCtxt::new().insert(
         st.symbol("print".to_owned()),
         Type::Function {
@@ -58,7 +58,8 @@ type SymbolTable = symbol_table::SymbolTable<String>;
 
 type VarCtxt = TreeMap<Symbol, Type>;
 
-struct SpecialSymbols {
+#[derive(Debug)]
+pub struct SpecialSymbols {
     bool: Type,
     void: Type,
     isize: Type,
@@ -104,7 +105,7 @@ pub fn type_check(mut ast: AbstractSyntaxTree) -> TypedAST {
         panic!("main should not return anything")
     }
     let main_body = tc_block(main.body, &mut st, &ss, var_ctxt, &mut Loop::No);
-    if main_body.r#type != ss.void {
+    if main_body.r#type != ss.void.clone() {
         panic!(
             "from main body, expected void got {}",
             st.displayable(&main_body.r#type)
@@ -113,11 +114,12 @@ pub fn type_check(mut ast: AbstractSyntaxTree) -> TypedAST {
     TypedAST {
         st,
         ast: vec![Function {
-            name: ss.main,
+            name: ss.main.clone(),
             binders: Vec::new(),
-            ret_type: ss.void,
+            ret_type: ss.void.clone(),
             body: main_body,
         }],
+        ss,
     }
 }
 
@@ -384,6 +386,7 @@ fn tc_expr(
 pub struct TypedAST {
     pub st: SymbolTable,
     pub ast: Vec<Function>,
+    pub ss: SpecialSymbols,
 }
 
 impl Display for TypedAST {
