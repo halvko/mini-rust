@@ -9,3 +9,4 @@ edition = "2018"
 parse = { path = "parse" }
 typecheck = { path = "typecheck" }
 symbol_table = { path = "symbol_table" }
+codegen = { path = "codegen" }
