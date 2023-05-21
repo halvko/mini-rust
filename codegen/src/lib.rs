@@ -3,6 +3,8 @@ use std::io;
 use symbol_table::{Symbol, SymbolTable};
 use typecheck::{Block, Expression, ExpressionKind, Function, Statement, Type, TypedAST};
 
+mod llvm;
+
 fn gen_buildin(
     buildin: (Symbol, &Type),
     st: &SymbolTable<String>,
@@ -25,6 +27,14 @@ fn gen_buildin(
         write!(o, ", {}", type_conv(arg, st))?;
     }
     writeln!(o, ")")?;
+    Ok(())
+}
+
+fn gen_mm_interface(st: &SymbolTable<String>, o: &mut impl io::Write) -> anyhow::Result<()> {
+    writeln!(o, "declare void @store_i64(ptr, i64, i64*)")?;
+    writeln!(o, "declare void @load_i64(ptr, i64*)")?;
+    writeln!(o, "declare void @store_i1(ptr, i1, i1*)")?;
+    writeln!(o, "declare void @load_i1(ptr, i1*)")?;
     Ok(())
 }
 
@@ -51,6 +61,7 @@ pub fn gen_ir(ast: TypedAST, out: &mut impl io::Write) -> anyhow::Result<()> {
     for (name, r#type) in typecheck::buildins(&mut st, &ss).iter() {
         gen_buildin((*name, r#type), &st, out)?;
     }
+    gen_mm_interface(&st, out)?;
     Ok(())
 }
 
@@ -95,7 +106,12 @@ fn gen_fn(
     } else {
         name.as_str()
     };
-    writeln!(o, "define {} @{} () {{", type_conv(&ret_type, st), name)?;
+    writeln!(
+        o,
+        "define {} @{} (ptr %mm) {{",
+        type_conv(&ret_type, st),
+        name
+    )?;
     for stmt in stmts {
         gen_stmt(stmt, st, t, o, &mut None)?;
     }
@@ -125,11 +141,7 @@ fn gen_stmt(
             let ident: String = format!("%{}", st.original(ident));
             writeln!(o, "{ident} = alloca {}", type_conv(&r#type, st))?;
             let expr = gen_expr(expr, st, t, o, l)?;
-            writeln!(
-                o,
-                "store {ty} {expr}, {ty}* {ident}",
-                ty = type_conv(&r#type, st)
-            )?;
+            llvm::store(type_conv(&r#type, st), &expr, &ident, o)?;
             Ok(())
         }
         Statement::Expr(e) => {
@@ -159,11 +171,7 @@ fn gen_expr(
                 };
                 let lhs = st.original(lhs);
                 let rhs = gen_expr(*rhs, st, t, o, l)?;
-                writeln!(
-                    o,
-                    "store {ty} {rhs}, {ty}* %{lhs}",
-                    ty = type_conv(&lhs_type, st)
-                )?;
+                llvm::store(type_conv(&lhs_type, st), &rhs, &lhs, o)?;
                 Ok("0".to_owned())
             } else {
                 let r#type = type_conv(&lhs.r#type, st);
@@ -211,7 +219,7 @@ fn gen_expr(
             writeln!(o, "\n{brk}:")?;
             let ret = t.next_reg();
             if r#type != "void" {
-                writeln!(o, "{ret} = load {type}, {type}* {break_reg}")?;
+                llvm::load(r#type, &ret, &break_reg, o)?;
                 Ok(ret)
             } else {
                 Ok("0".to_owned())
@@ -224,7 +232,7 @@ fn gen_expr(
                 let Some(l) = l else {
                     panic!("ICE");
                 };
-                writeln!(o, "store {ty} {e_reg}, {ty}* {}", l.break_reg)?;
+                llvm::store(ty, &e_reg, &l.break_reg, o)?;
             };
             let Some(l) = l else {
                 panic!("ICE");
@@ -256,7 +264,7 @@ fn gen_expr(
             writeln!(o, "{if_label}:")?;
             let if_ret = gen_block(block, st, t, o, l)?;
             if r#type != "void" {
-                writeln!(o, "store {type} {if_ret}, {type}* {ret_alloc}")?;
+                llvm::store(r#type, &if_ret, &ret_alloc, o)?;
             }
             writeln!(o, "br label %{finally_label}")?;
 
@@ -264,7 +272,7 @@ fn gen_expr(
                 writeln!(o, "\n{else_label}:")?;
                 let else_ret = gen_block(else_block, st, t, o, l)?;
                 if r#type != "void" {
-                    writeln!(o, "store {type} {else_ret}, {type}* {ret_alloc}")?;
+                    llvm::store(r#type, &else_ret, &ret_alloc, o)?;
                 }
                 writeln!(o, "br label %{finally_label}")?;
             }
@@ -273,7 +281,7 @@ fn gen_expr(
 
             if r#type != "void" {
                 let ret = t.next_reg();
-                writeln!(o, "{ret} = load {type}, {type}* %{ret_alloc}")?;
+                llvm::load(r#type, &ret, &ret_alloc, o)?;
                 Ok(ret)
             } else {
                 Ok("0".to_owned())
@@ -282,7 +290,7 @@ fn gen_expr(
         typecheck::ExpressionKind::Block(b) => gen_block(b, st, t, o, l),
         typecheck::ExpressionKind::Var { ident } => {
             let ret = t.next_reg();
-            writeln!(o, "{ret} = load {type}, {type}* %{}", st.original(ident))?;
+            llvm::load(r#type, &ret, st.original(ident), o)?;
             Ok(ret)
         }
         typecheck::ExpressionKind::Val(v) => match v {
