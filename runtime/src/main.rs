@@ -1,5 +1,5 @@
 mod mini_defs {
-    #[link(name = "simple", kind = "static")]
+    #[link(name = "mr", kind = "static")]
     extern "C" {
         pub fn mr_main();
     }
