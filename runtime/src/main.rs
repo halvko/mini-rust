@@ -1,5 +1,3 @@
-use std::ffi::c_void;
-
 mod mini_defs {
     use std::ffi::c_void;
 
@@ -16,33 +14,25 @@ impl MemoryManager {
         Self {}
     }
 
-    pub extern "C" fn store_i64(&mut self, value: u64, location: *mut u64) {
+    fn store_i64(&mut self, value: u64, location: *mut u64) {
         unsafe { location.write(value) }
     }
 
-    pub extern "C" fn load_i64(&mut self, location: *const u64) -> u64 {
+    fn load_i64(&mut self, location: *const u64) -> u64 {
         unsafe { location.read() }
     }
 
-    pub extern "C" fn store_i1(&mut self, value: bool, location: *mut bool) {
+    fn store_i1(&mut self, value: bool, location: *mut bool) {
         unsafe { location.write(value) }
     }
 
-    pub extern "C" fn load_i1(&mut self, location: *const bool) -> bool {
+    fn load_i1(&mut self, location: *const bool) -> bool {
         unsafe { location.read() }
     }
 }
 
 fn main() {
-    let mut mm = MemoryManager::new();
-    println!("0");
-    let mm = &mut mm;
-    println!("1");
-    let mm: *mut _ = mm;
-    println!("2");
-    let mm: *mut c_void = mm.cast();
-    println!("3");
-    unsafe { mini_defs::mr_main(mm) }
+    unsafe { mini_defs::mr_main(&mut MemoryManager::new() as *mut _ as _) }
 }
 
 #[no_mangle]
