@@ -7,3 +7,10 @@ edition = "2021"
 
 [dependencies]
 typecheck = {path = "../typecheck"}
+
+[profile.release]
+lto = "fat"
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
