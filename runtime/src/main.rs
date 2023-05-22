@@ -1,3 +1,8 @@
+use std::hash::{BuildHasher, Hash, Hasher};
+
+use ahash::HashMapExt;
+use hwlocality::{cpu::binding::CpuBindingFlags, objects::types::ObjectType};
+
 mod mini_defs {
     use std::ffi::c_void;
 
@@ -7,14 +12,27 @@ mod mini_defs {
     }
 }
 
-pub struct MemoryManager {}
+pub struct MemoryManager {
+    h: ahash::AHasher,
+    original_i64_values: ahash::HashMap<*mut u64, u64>,
+    original_i1_values: ahash::HashMap<*mut bool, bool>,
+}
 
 impl MemoryManager {
-    fn new() -> Self {
-        Self {}
+    fn new(h: ahash::AHasher) -> Self {
+        Self {
+            h,
+            original_i64_values: ahash::HashMap::new(),
+            original_i1_values: ahash::HashMap::new(),
+        }
     }
 
     fn store_i64(&mut self, value: u64, location: *mut u64) {
+        if !self.original_i64_values.contains_key(&location) {
+            self.original_i64_values.insert(location, value);
+        }
+        location.hash(&mut self.h);
+        value.hash(&mut self.h);
         unsafe { location.write(value) }
     }
 
@@ -23,16 +41,72 @@ impl MemoryManager {
     }
 
     fn store_i1(&mut self, value: bool, location: *mut bool) {
+        if !self.original_i1_values.contains_key(&location) {
+            self.original_i1_values.insert(location, value);
+        }
+        location.hash(&mut self.h);
+        value.hash(&mut self.h);
         unsafe { location.write(value) }
     }
 
     fn load_i1(&mut self, location: *const bool) -> bool {
         unsafe { location.read() }
     }
+
+    fn restore(&mut self, rs: &ahash::RandomState) {
+        for (loc, val) in self.original_i64_values.drain() {
+            unsafe { loc.write(val) }
+        }
+        for (loc, val) in self.original_i1_values.drain() {
+            unsafe { loc.write(val) }
+        }
+        self.h = rs.build_hasher();
+    }
 }
 
 fn main() {
-    unsafe { mini_defs::mr_main(&mut MemoryManager::new() as *mut _ as _) }
+    let build_hasher = ahash::RandomState::new();
+    let mm = &mut MemoryManager::new(build_hasher.build_hasher());
+
+    let topology = hwlocality::Topology::new().unwrap();
+    let cpu_support = topology.feature_support().cpu_binding().unwrap();
+
+    if !cpu_support.set_thread() {
+        panic!()
+    }
+
+    let core_depth = topology.depth_or_below_for_type(ObjectType::Core).unwrap();
+    let mut cores = topology.objects_at_depth(core_depth);
+
+    let tid = unsafe { libc::pthread_self() };
+
+    let mut bind_to = cores.next().unwrap().cpuset().unwrap().clone();
+
+    bind_to.singlify();
+
+    topology
+        .bind_thread_cpu(tid, &bind_to, CpuBindingFlags::THREAD)
+        .unwrap();
+
+    unsafe { mini_defs::mr_main(mm as *mut _ as _) };
+
+    let hash = mm.h.finish();
+    println!("{hash}");
+    mm.restore(&build_hasher);
+
+    bind_to = cores.next().unwrap().cpuset().unwrap().clone();
+
+    bind_to.singlify();
+
+    topology
+        .bind_thread_cpu(tid, &bind_to, CpuBindingFlags::THREAD)
+        .unwrap();
+
+    unsafe { mini_defs::mr_main(mm as *mut _ as _) };
+
+    if mm.h.finish() == hash {
+        println!("Equal hashes between runs")
+    }
 }
 
 #[no_mangle]
