@@ -1,7 +1,8 @@
 use std::{
     env::args,
     fs::{self, File},
-    path, process,
+    path::{self, PathBuf},
+    process,
 };
 
 use parse;
@@ -21,41 +22,72 @@ fn main() {
         .split_once('.')
         .unwrap();
 
+    let base_path = {
+        let mut bp = input_path.clone();
+        bp.pop();
+        bp
+    };
+
     let input = fs::read_to_string(&input_path).unwrap();
     let ast = parse::gen_ast(&input).unwrap();
     let typed_ast = typecheck::type_check(ast);
-    let ll_name = format!("{file_name}.ll");
-    let mut llvm_file = File::create(&ll_name).unwrap();
+    let ll_path = [&base_path, &format!("{file_name}.ll").into()]
+        .iter()
+        .collect::<PathBuf>();
+
+    let mut llvm_file = File::create(&ll_path).unwrap();
     codegen::gen_ir(typed_ast, &mut llvm_file).unwrap();
 
-    let clang = process::Command::new("clang")
-        .args(["-c", "-o", &format!("{file_name}.o"), &ll_name])
-        .output()
-        .unwrap();
-    if !clang.stderr.is_empty() {
+    let o_path = [&base_path, &format!("{file_name}.o").into()]
+        .iter()
+        .collect::<PathBuf>();
+
+    run_and_print_command(process::Command::new("clang").args([
+        "-c",
+        "-o",
+        &o_path.to_str().unwrap(),
+        &ll_path.to_str().unwrap(),
+    ]));
+    let lib_path = [&base_path, &format!("lib{file_name}.a").into()]
+        .iter()
+        .collect::<PathBuf>();
+    run_and_print_command(process::Command::new("ar").args([
+        "rcs",
+        lib_path.to_str().unwrap(),
+        o_path.to_str().unwrap(),
+    ]));
+
+    run_and_print_command(
+        process::Command::new("mv").args([lib_path.to_str().unwrap(), "./runtime/mr_obj/libmr.a"]),
+    );
+
+    run_and_print_command(
+        process::Command::new("cargo")
+            .current_dir("./runtime")
+            .args(["b", "-q", "-r"]),
+    );
+
+    let exe_path = [&base_path, &file_name.into()].iter().collect::<PathBuf>();
+    run_and_print_command(process::Command::new("mv").args([
+        "./runtime/target/release/runtime",
+        exe_path.to_str().unwrap(),
+    ]));
+}
+
+fn run_and_print_command(p: &mut process::Command) {
+    let output = p.output().unwrap();
+    if !output.stderr.is_empty() {
         println!(
-            "clang stderr:\n{}",
-            String::from_utf8(clang.stderr).unwrap()
+            "{} stderr:\n{}",
+            p.get_program().to_str().unwrap(),
+            String::from_utf8(output.stderr).unwrap()
         )
     }
-    if !clang.stdout.is_empty() {
+    if !output.stdout.is_empty() {
         println!(
-            "clang stdout:\n{}",
-            String::from_utf8(clang.stdout).unwrap()
+            "{} stderr:\n{}",
+            p.get_program().to_str().unwrap(),
+            String::from_utf8(output.stdout).unwrap()
         )
-    }
-    let ar = process::Command::new("ar")
-        .args([
-            "rcs",
-            &format!("lib{file_name}.a"),
-            &format!("{file_name}.o"),
-        ])
-        .output()
-        .unwrap();
-    if !ar.stderr.is_empty() {
-        println!("ar stderr:\n{}", String::from_utf8(ar.stderr).unwrap())
-    }
-    if !ar.stdout.is_empty() {
-        println!("ar stdout:\n{}", String::from_utf8(ar.stdout).unwrap())
     }
 }

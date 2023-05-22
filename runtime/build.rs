@@ -1,4 +1,6 @@
+use std::env;
+
 fn main() {
-    println!("cargo:rerun-if-changed=/home/erikfc/code/rust/mini-rust/");
-    println!("cargo:rustc-link-search=/home/erikfc/code/rust/mini-rust/");
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    println!("cargo:rustc-link-search={manifest_dir}/mr_obj");
 }
