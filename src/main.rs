@@ -43,6 +43,7 @@ fn main() {
         .collect::<PathBuf>();
 
     run_and_print_command(process::Command::new("clang").args([
+        "-O2",
         "-c",
         "-o",
         &o_path.to_str().unwrap(),
