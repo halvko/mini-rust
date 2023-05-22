@@ -1,0 +1,11 @@
+fn main() {
+    let a = 0usize;
+    let b = 1000000000usize;
+    let c = loop {
+        if a == b {
+            break true;
+        } else {
+            a = (a + 1usize);
+        }
+    };
+}
