@@ -64,6 +64,7 @@ fn main() {
 
     run_and_print_command(
         process::Command::new("cargo")
+            .env("RUSTFLAGS", "-C target-cpu=native")
             .current_dir("./runtime")
             .args(["b", "-q", "-r"]),
     );
