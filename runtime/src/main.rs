@@ -12,18 +12,20 @@ mod mini_defs {
     }
 }
 
-pub struct MemoryManager {
+pub struct RuntimeManager {
     h: ahash::AHasher,
     original_i64_values: ahash::HashMap<*mut u64, u64>,
     original_i1_values: ahash::HashMap<*mut bool, bool>,
+    dirty: bool,
 }
 
-impl MemoryManager {
+impl RuntimeManager {
     fn new(h: ahash::AHasher) -> Self {
         Self {
             h,
             original_i64_values: ahash::HashMap::new(),
             original_i1_values: ahash::HashMap::new(),
+            dirty: false,
         }
     }
 
@@ -41,6 +43,7 @@ impl MemoryManager {
     }
 
     fn store_i1(&mut self, value: bool, location: *mut bool) {
+        let value = if self.dirty { !value } else { value };
         if !self.original_i1_values.contains_key(&location) {
             self.original_i1_values.insert(location, value);
         }
@@ -61,12 +64,13 @@ impl MemoryManager {
             unsafe { loc.write(val) }
         }
         self.h = rs.build_hasher();
+        self.dirty = true;
     }
 }
 
 fn main() {
     let build_hasher = ahash::RandomState::new();
-    let mm = &mut MemoryManager::new(build_hasher.build_hasher());
+    let mm = &mut RuntimeManager::new(build_hasher.build_hasher());
 
     let topology = hwlocality::Topology::new().unwrap();
     let cpu_support = topology.feature_support().cpu_binding().unwrap();
@@ -103,9 +107,12 @@ fn main() {
         .unwrap();
 
     unsafe { mini_defs::mr_main(mm as *mut _ as _) };
-
-    if mm.h.finish() == hash {
+    let second = mm.h.finish();
+    println!("{second}");
+    if second == hash {
         println!("Equal hashes between runs")
+    } else {
+        println!("Corruption in one of the runs!")
     }
 }
 
@@ -120,21 +127,21 @@ pub extern "C" fn sleep(secs: u64) {
 }
 
 #[no_mangle]
-pub extern "C" fn store_i64(mm: *mut MemoryManager, value: u64, location: *mut u64) {
+pub extern "C" fn store_i64(mm: *mut RuntimeManager, value: u64, location: *mut u64) {
     unsafe { &mut *mm }.store_i64(value, location)
 }
 
 #[no_mangle]
-pub extern "C" fn load_i64(mm: *mut MemoryManager, location: *const u64) -> u64 {
+pub extern "C" fn load_i64(mm: *mut RuntimeManager, location: *const u64) -> u64 {
     unsafe { &mut *mm }.load_i64(location)
 }
 
 #[no_mangle]
-pub extern "C" fn store_i1(mm: *mut MemoryManager, value: bool, location: *mut bool) {
+pub extern "C" fn store_i1(mm: *mut RuntimeManager, value: bool, location: *mut bool) {
     unsafe { &mut *mm }.store_i1(value, location)
 }
 
 #[no_mangle]
-pub extern "C" fn load_i1(mm: *mut MemoryManager, location: *const bool) -> bool {
+pub extern "C" fn load_i1(mm: *mut RuntimeManager, location: *const bool) -> bool {
     unsafe { &mut *mm }.load_i1(location)
 }
