@@ -89,7 +89,7 @@ struct Load<'a> {
 impl Load<'_> {
     fn direct(&self, o: &mut impl io::Write) -> anyhow::Result<()> {
         let Self { ty, from, to } = self;
-        writeln!(o, "{to} = load {ty}* {from}")?;
+        writeln!(o, "{to} = load {ty}, {ty}* {from}")?;
         Ok(())
     }
     fn indirect(&self, o: &mut impl io::Write) -> anyhow::Result<()> {
