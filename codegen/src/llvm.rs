@@ -21,7 +21,7 @@ impl Display for Label {
         self.name.fmt(f)
     }
 }
-
+#[allow(clippy::upper_case_acronyms)]
 pub struct LLVM {
     memory_indirection: bool,
 }

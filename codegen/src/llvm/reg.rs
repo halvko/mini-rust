@@ -54,7 +54,7 @@ pub struct RegRef<'a> {
 
 impl Display for RegRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.name)
+        f.write_str(self.name)
     }
 }
 
@@ -76,7 +76,7 @@ impl<'a> From<RegRef<'a>> for CowReg<'a> {
 }
 
 impl CowReg<'_> {
-    pub fn as_ref<'a>(&'a self) -> RegRef<'a> {
+    pub fn as_ref(&self) -> RegRef {
         match self {
             CowReg::Owned(reg) => reg.as_ref(),
             CowReg::Borrowed(b) => *b,

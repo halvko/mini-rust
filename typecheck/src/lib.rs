@@ -47,7 +47,7 @@ impl STDisplay for Type {
             Type::Simple(s) => st.original(*s).fmt(f),
             Type::Function { args, ret } => {
                 f.write_str("fn(")?;
-                let mut args = args.into_iter();
+                let mut args = args.iter();
                 if let Some(arg) = args.next() {
                     arg.fmt(f, st)?;
                 }
@@ -100,7 +100,7 @@ pub fn type_check(mut ast: AbstractSyntaxTree) -> TypedAST {
             inner: "main".to_owned(),
         })
         .unwrap();
-    if main.args.len() > 0 {
+    if !main.args.is_empty() {
         panic!("too many arguments to main")
     }
     if main.ret_type
@@ -122,7 +122,7 @@ pub fn type_check(mut ast: AbstractSyntaxTree) -> TypedAST {
     TypedAST {
         st,
         ast: vec![Function {
-            name: ss.main.clone(),
+            name: ss.main,
             binders: Vec::new(),
             ret_type: ss.void.clone(),
             body: main_body,
@@ -230,13 +230,11 @@ fn tc_expr(
                 if block.r#type != else_block.r#type {
                     panic!("if {{...}} else {{...}} expression has mismatching types: if -> {}, else -> {}", st.displayable(&block.r#type), st.displayable(&else_block.r#type))
                 }
-            } else {
-                if block.r#type != ss.void {
-                    panic!(
-                        "if {{...}} with no else returns {}, expected void",
-                        st.displayable(&block.r#type)
-                    )
-                }
+            } else if block.r#type != ss.void {
+                panic!(
+                    "if {{...}} with no else returns {}, expected void",
+                    st.displayable(&block.r#type)
+                )
             }
 
             Expression {
@@ -289,7 +287,7 @@ fn tc_expr(
         },
         parse::expression::Expression::BinExp(lhs, ifx, rhs) => {
             let lhs = tc_expr(*lhs, st, ss, var_ctxt.clone(), r#loop);
-            let rhs = tc_expr(*rhs, st, ss, var_ctxt.clone(), r#loop);
+            let rhs = tc_expr(*rhs, st, ss, var_ctxt, r#loop);
             if lhs.r#type != rhs.r#type {
                 panic!("Trying to do operation between different types")
             }
@@ -311,7 +309,7 @@ fn tc_expr(
                 _ => todo!("Properly fix operators -.-"),
             };
             Expression {
-                r#type: r#type,
+                r#type,
                 kind: ExpressionKind::BinExp {
                     lhs: Box::new(lhs),
                     op: infix,
@@ -344,7 +342,7 @@ fn tc_expr(
             }
             Expression {
                 r#type: ss.void.clone(),
-                kind: ExpressionKind::Break(e.map(|e| Box::new(e))),
+                kind: ExpressionKind::Break(e.map(Box::new)),
             }
         }
         parse::expression::Expression::CallExp(c) => {
@@ -379,7 +377,7 @@ fn tc_expr(
                 }
             }
             Expression {
-                r#type: *ret.clone(),
+                r#type: *ret,
                 kind: ExpressionKind::Call {
                     fn_expr: Box::new(expr),
                     params: call_args,

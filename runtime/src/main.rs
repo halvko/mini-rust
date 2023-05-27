@@ -16,7 +16,6 @@ pub struct RuntimeManager {
     h: ahash::AHasher,
     original_i64_values: ahash::HashMap<*mut u64, u64>,
     original_i1_values: ahash::HashMap<*mut bool, bool>,
-    dirty: bool,
 }
 
 impl RuntimeManager {
@@ -25,14 +24,13 @@ impl RuntimeManager {
             h,
             original_i64_values: ahash::HashMap::new(),
             original_i1_values: ahash::HashMap::new(),
-            dirty: false,
         }
     }
 
     fn store_i64(&mut self, value: u64, location: *mut u64) {
-        if !self.original_i64_values.contains_key(&location) {
-            self.original_i64_values.insert(location, value);
-        }
+        self.original_i64_values
+            .entry(location)
+            .or_insert_with(|| unsafe { location.read() });
         location.hash(&mut self.h);
         value.hash(&mut self.h);
         unsafe { location.write(value) }
@@ -43,10 +41,9 @@ impl RuntimeManager {
     }
 
     fn store_i1(&mut self, value: bool, location: *mut bool) {
-        let value = if self.dirty { !value } else { value };
-        if !self.original_i1_values.contains_key(&location) {
-            self.original_i1_values.insert(location, value);
-        }
+        self.original_i1_values
+            .entry(location)
+            .or_insert_with(|| unsafe { location.read() });
         location.hash(&mut self.h);
         value.hash(&mut self.h);
         unsafe { location.write(value) }
@@ -64,7 +61,6 @@ impl RuntimeManager {
             unsafe { loc.write(val) }
         }
         self.h = rs.build_hasher();
-        self.dirty = true;
     }
 }
 
@@ -126,22 +122,34 @@ pub extern "C" fn sleep(secs: u64) {
     std::thread::sleep(std::time::Duration::from_secs(secs))
 }
 
+/// # Safety
+///
+/// First argument must be an unique pointer to a [RuntimeManager]
 #[no_mangle]
-pub extern "C" fn store_i64(mm: *mut RuntimeManager, value: u64, location: *mut u64) {
+pub unsafe extern "C" fn store_i64(mm: *mut RuntimeManager, value: u64, location: *mut u64) {
     unsafe { &mut *mm }.store_i64(value, location)
 }
 
+/// # Safety
+///
+/// First argument must be an unique pointer to a [RuntimeManager]
 #[no_mangle]
-pub extern "C" fn load_i64(mm: *mut RuntimeManager, location: *const u64) -> u64 {
+pub unsafe extern "C" fn load_i64(mm: *mut RuntimeManager, location: *const u64) -> u64 {
     unsafe { &mut *mm }.load_i64(location)
 }
 
+/// # Safety
+///
+/// First argument must be an unique pointer to a [RuntimeManager]
 #[no_mangle]
-pub extern "C" fn store_i1(mm: *mut RuntimeManager, value: bool, location: *mut bool) {
+pub unsafe extern "C" fn store_i1(mm: *mut RuntimeManager, value: bool, location: *mut bool) {
     unsafe { &mut *mm }.store_i1(value, location)
 }
 
+/// # Safety
+///
+/// First argument must be an unique pointer to a [RuntimeManager]
 #[no_mangle]
-pub extern "C" fn load_i1(mm: *mut RuntimeManager, location: *const bool) -> bool {
+pub unsafe extern "C" fn load_i1(mm: *mut RuntimeManager, location: *const bool) -> bool {
     unsafe { &mut *mm }.load_i1(location)
 }

@@ -1,0 +1,12 @@
+- Benchmark
+- Using QEMU for fault injection (break specific instructions)?
+ - https://github.com/ahoeller/fies
+- Add functions
+- Allow for, at function calls, change to detection mode, and change back after fx. a certain number of
+  reads and writes 
+  - Rememeber instruction counter, give that to runtime 
+
+- Add floats
+  - Matrix multipication?
+  - Ray tracer?
+

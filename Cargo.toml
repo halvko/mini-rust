@@ -1,12 +1,16 @@
-[package]
-name = "mini-rust"
-version = "0.1.0"
-edition = "2018"
+[workspace]
+members = [
+  "parse",
+  "typecheck",
+  "symbol_table",
+  "codegen",
+  "compiler",
+  "runtime",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+lto = "fat"
 
-[dependencies]
-parse = { path = "parse" }
-typecheck = { path = "typecheck" }
-symbol_table = { path = "symbol_table" }
-codegen = { path = "codegen" }
+[profile.release-with-debug]
+inherits = "release"
+debug = true

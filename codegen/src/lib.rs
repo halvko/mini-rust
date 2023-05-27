@@ -114,7 +114,7 @@ fn gen_fn(
         body: Block { stmts, expr, .. },
     } = f;
 
-    if binders.len() > 0 {
+    if !binders.is_empty() {
         todo!("impl function arguments")
     }
     let name = st.original(name);
