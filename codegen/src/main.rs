@@ -16,5 +16,5 @@ fn main() {
     let parsed = parse::gen_ast(input).unwrap();
     let tted = typecheck::type_check(parsed);
     let mut stdout = stdout();
-    codegen::gen_ir(tted, &mut stdout).unwrap();
+    codegen::gen_ir(tted, &mut stdout, Default::default()).unwrap();
 }

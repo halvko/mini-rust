@@ -52,14 +52,6 @@ pub struct RegRef<'a> {
     name: &'a str,
 }
 
-impl RegRef<'_> {
-    fn to_owned(&self) -> Reg {
-        Reg {
-            name: self.name.to_owned(),
-        }
-    }
-}
-
 impl Display for RegRef<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.name)

@@ -8,9 +8,6 @@ impl Type {
     pub fn as_ref(&self) -> TypeRef {
         TypeRef { name: &self.name }
     }
-    pub fn is_void(&self) -> bool {
-        self.as_ref().is_void()
-    }
     pub fn from_static(name: &'static str) -> TypeRef<'static> {
         TypeRef { name }
     }

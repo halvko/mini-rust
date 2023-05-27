@@ -6,6 +6,36 @@ use typecheck::{Block, Expression, ExpressionKind, Function, Statement, Type, Ty
 
 mod llvm;
 
+pub struct Options {
+    pub memory_indirection: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            memory_indirection: true,
+        }
+    }
+}
+
+pub fn gen_ir(ast: TypedAST, out: &mut impl io::Write, options: Options) -> anyhow::Result<()> {
+    let TypedAST { mut st, ast, ss } = ast;
+    let mut tmp = Tmp::default();
+    writeln!(out, r#"target triple = "x86_64-pc-linux-gnu""#)?;
+
+    let gen = llvm::LLVM::from(&options);
+
+    for f in ast {
+        gen_fn(f, &st, &mut tmp, out, &gen)?;
+    }
+
+    for (name, r#type) in typecheck::buildins(&mut st, &ss).iter() {
+        gen_buildin((*name, r#type), &st, out)?;
+    }
+    gen_mm_interface(&st, out)?;
+    Ok(())
+}
+
 fn gen_buildin(
     buildin: (Symbol, &Type),
     st: &SymbolTable<String>,
@@ -51,21 +81,6 @@ fn type_conv(r#type: &Type, st: &SymbolTable<String>) -> llvm::CowType<'static> 
     }
 }
 
-pub fn gen_ir(ast: TypedAST, out: &mut impl io::Write) -> anyhow::Result<()> {
-    let TypedAST { mut st, ast, ss } = ast;
-    let mut tmp = Tmp::default();
-    writeln!(out, r#"target triple = "x86_64-pc-linux-gnu""#)?;
-    for f in ast {
-        gen_fn(f, &st, &mut tmp, out)?;
-    }
-
-    for (name, r#type) in typecheck::buildins(&mut st, &ss).iter() {
-        gen_buildin((*name, r#type), &st, out)?;
-    }
-    gen_mm_interface(&st, out)?;
-    Ok(())
-}
-
 #[derive(Default)]
 struct Tmp {
     reg: usize,
@@ -90,6 +105,7 @@ fn gen_fn(
     st: &SymbolTable<String>,
     t: &mut Tmp,
     o: &mut impl io::Write,
+    gen: &llvm::LLVM,
 ) -> anyhow::Result<()> {
     let Function {
         name,
@@ -114,10 +130,10 @@ fn gen_fn(
         name
     )?;
     for stmt in stmts {
-        gen_stmt(stmt, st, t, o, &mut None)?;
+        gen_stmt(stmt, gen, st, t, o, &mut None)?;
     }
     if let Some(e) = expr {
-        let ret = gen_expr(*e, st, t, o, &mut None)?;
+        let ret = gen_expr(*e, gen, st, t, o, &mut None)?;
         writeln!(o, "ret {ret}")?;
     } else {
         writeln!(o, "ret void")?;
@@ -128,6 +144,7 @@ fn gen_fn(
 
 fn gen_stmt(
     stmt: Statement,
+    gen: &llvm::LLVM,
     st: &SymbolTable<String>,
     t: &mut Tmp,
     o: &mut impl io::Write,
@@ -141,12 +158,12 @@ fn gen_stmt(
         } => {
             let ident = llvm::Reg::from_plain(st.original(ident));
             writeln!(o, "{ident} = alloca {}", type_conv(&r#type, st))?;
-            let expr = gen_expr(expr, st, t, o, l)?;
-            llvm::store(type_conv(&r#type, st), expr.as_ref(), ident.as_ref(), o)?;
+            let expr = gen_expr(expr, gen, st, t, o, l)?;
+            gen.store(type_conv(&r#type, st), expr.as_ref(), ident.as_ref(), o)?;
             Ok(())
         }
         Statement::Expr(e) => {
-            gen_expr(e, st, t, o, l)?;
+            gen_expr(e, gen, st, t, o, l)?;
             Ok(())
         }
     }
@@ -154,6 +171,7 @@ fn gen_stmt(
 
 fn gen_expr(
     expr: Expression,
+    gen: &llvm::LLVM,
     st: &SymbolTable<String>,
     t: &mut Tmp,
     o: &mut impl io::Write,
@@ -171,8 +189,8 @@ fn gen_expr(
                     (ident, var_type)
                 };
                 let lhs = st.original(lhs);
-                let rhs = gen_expr(*rhs, st, t, o, l)?;
-                llvm::store(
+                let rhs = gen_expr(*rhs, gen, st, t, o, l)?;
+                gen.store(
                     type_conv(&lhs_type, st),
                     rhs.as_ref(),
                     llvm::Reg::from_plain(lhs).as_ref(),
@@ -181,8 +199,8 @@ fn gen_expr(
                 Ok(llvm::Reg::zero().into())
             } else {
                 let r#type = type_conv(&lhs.r#type, st);
-                let lhs = gen_expr(*lhs, st, t, o, l)?;
-                let rhs = gen_expr(*rhs, st, t, o, l)?;
+                let lhs = gen_expr(*lhs, gen, st, t, o, l)?;
+                let rhs = gen_expr(*rhs, gen, st, t, o, l)?;
 
                 match op {
                     typecheck::Infix::Add => {
@@ -214,7 +232,7 @@ fn gen_expr(
                 break_reg,
             };
             let l = &mut Some(l);
-            gen_block(block, st, t, o, l)?;
+            gen_block(block, gen, st, t, o, l)?;
             let Some(Loop {
                 cont_label: cont,
                 break_label: brk,
@@ -225,7 +243,7 @@ fn gen_expr(
             writeln!(o, "\n{brk}:")?;
             let ret = t.next_reg();
             if !r#type.is_void() {
-                llvm::load(r#type, ret.as_ref(), break_reg.as_ref(), o)?;
+                gen.load(r#type, ret.as_ref(), break_reg.as_ref(), o)?;
                 Ok(ret.into())
             } else {
                 Ok(Reg::zero().into())
@@ -234,11 +252,11 @@ fn gen_expr(
         typecheck::ExpressionKind::Break(e) => {
             if let Some(e) = e {
                 let ty = type_conv(&e.r#type, st);
-                let e_reg = gen_expr(*e, st, t, o, l)?;
+                let e_reg = gen_expr(*e, gen, st, t, o, l)?;
                 let Some(l) = l else {
                     panic!("ICE");
                 };
-                llvm::store(ty, e_reg, l.break_reg.as_ref(), o)?;
+                gen.store(ty, e_reg, l.break_reg.as_ref(), o)?;
             };
             let Some(l) = l else {
                 panic!("ICE");
@@ -255,7 +273,7 @@ fn gen_expr(
             let else_label = t.next_label();
             let finally_label = t.next_label();
             let ret_alloc = t.next_reg();
-            let cond = gen_expr(*cond, st, t, o, l)?;
+            let cond = gen_expr(*cond, gen, st, t, o, l)?;
             if !r#type.is_void() {
                 writeln!(o, "{ret_alloc} = alloca {type}")?;
             }
@@ -268,17 +286,17 @@ fn gen_expr(
                 )?;
             }
             writeln!(o, "{if_label}:")?;
-            let if_ret = gen_block(block, st, t, o, l)?;
+            let if_ret = gen_block(block, gen, st, t, o, l)?;
             if !r#type.is_void() {
-                llvm::store(r#type.as_ref(), if_ret, ret_alloc.as_ref(), o)?;
+                gen.store(r#type.as_ref(), if_ret, ret_alloc.as_ref(), o)?;
             }
             writeln!(o, "br label %{finally_label}")?;
 
             if let Some(else_block) = else_block {
                 writeln!(o, "\n{else_label}:")?;
-                let else_ret = gen_block(else_block, st, t, o, l)?;
+                let else_ret = gen_block(else_block, gen, st, t, o, l)?;
                 if !r#type.is_void() {
-                    llvm::store(r#type.as_ref(), else_ret, ret_alloc.as_ref(), o)?;
+                    gen.store(r#type.as_ref(), else_ret, ret_alloc.as_ref(), o)?;
                 }
                 writeln!(o, "br label %{finally_label}")?;
             }
@@ -287,23 +305,23 @@ fn gen_expr(
 
             if !r#type.is_void() {
                 let ret = t.next_reg();
-                llvm::load(r#type, ret.as_ref(), ret_alloc, o)?;
+                gen.load(r#type, ret.as_ref(), ret_alloc, o)?;
                 Ok(ret.into())
             } else {
                 Ok(Reg::zero().into())
             }
         }
-        typecheck::ExpressionKind::Block(b) => gen_block(b, st, t, o, l),
+        typecheck::ExpressionKind::Block(b) => gen_block(b, gen, st, t, o, l),
         typecheck::ExpressionKind::Var { ident } => {
             let ret = t.next_reg();
-            llvm::load(r#type, ret.as_ref(), Reg::from_plain(st.original(ident)), o)?;
+            gen.load(r#type, ret.as_ref(), Reg::from_plain(st.original(ident)), o)?;
             Ok(ret.into())
         }
         typecheck::ExpressionKind::Val(v) => Ok(Reg::from_value(v)),
         typecheck::ExpressionKind::Call { fn_expr, params } => {
             let mut computed_params = Vec::new();
             for param in params {
-                computed_params.push((param.r#type.clone(), gen_expr(param, st, t, o, l)?));
+                computed_params.push((param.r#type.clone(), gen_expr(param, gen, st, t, o, l)?));
             }
             let typecheck::Expression { kind, .. } = *fn_expr;
             let typecheck::ExpressionKind::Var { ident } = kind else {
@@ -338,6 +356,7 @@ struct Loop {
 
 fn gen_block(
     b: Block,
+    gen: &llvm::LLVM,
     s: &SymbolTable<String>,
     t: &mut Tmp,
     o: &mut impl io::Write,
@@ -345,10 +364,10 @@ fn gen_block(
 ) -> anyhow::Result<CowReg<'static>> {
     let Block { stmts, expr, .. } = b;
     for stmt in stmts {
-        gen_stmt(stmt, s, t, o, l)?;
+        gen_stmt(stmt, gen, s, t, o, l)?;
     }
     if let Some(expr) = expr {
-        gen_expr(*expr, s, t, o, l)
+        gen_expr(*expr, gen, s, t, o, l)
     } else {
         Ok(Reg::zero().into())
     }
