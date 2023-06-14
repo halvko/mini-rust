@@ -16,5 +16,13 @@ fn main() {
     let parsed = parse::gen_ast(input).unwrap();
     let tted = typecheck::type_check(parsed);
     let mut stdout = stdout();
-    codegen::gen_ir(tted, &mut stdout, Default::default()).unwrap();
+    codegen::gen_ir(
+        tted,
+        &mut stdout,
+        codegen::Options {
+            memory_indirection: true,
+            target: "x86_64-unknown-linux-gnu",
+        },
+    )
+    .unwrap();
 }

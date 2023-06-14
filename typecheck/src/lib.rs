@@ -23,6 +23,20 @@ pub fn buildins(st: &mut SymbolTable, ss: &SpecialSymbols) -> VarCtxt {
                 ret: Box::new(ss.void.clone()),
             },
         )
+        .insert(
+            st.symbol("output_i64".to_owned()),
+            Type::Function {
+                args: vec![ss.isize.clone()],
+                ret: Box::new(ss.void.clone()),
+            },
+        )
+        .insert(
+            st.symbol("output_i1".to_owned()),
+            Type::Function {
+                args: vec![ss.bool.clone()],
+                ret: Box::new(ss.void.clone()),
+            },
+        )
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]

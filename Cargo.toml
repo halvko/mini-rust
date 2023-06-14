@@ -5,7 +5,7 @@ members = [
   "symbol_table",
   "codegen",
   "compiler",
-  "runtime",
+  "runtime"
 ]
 
 [profile.release]

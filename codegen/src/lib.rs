@@ -6,24 +6,19 @@ use typecheck::{Block, Expression, ExpressionKind, Function, Statement, Type, Ty
 
 mod llvm;
 
-pub struct Options {
+#[derive(Clone, Copy)]
+pub struct Options<'a> {
     pub memory_indirection: bool,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self {
-            memory_indirection: true,
-        }
-    }
+    pub target: &'a str,
 }
 
 pub fn gen_ir(ast: TypedAST, out: &mut impl io::Write, options: Options) -> anyhow::Result<()> {
     let TypedAST { mut st, ast, ss } = ast;
     let mut tmp = Tmp::default();
-    writeln!(out, r#"target triple = "x86_64-pc-linux-gnu""#)?;
 
     let gen = llvm::LLVM::from(&options);
+
+    gen.initialize_target(out)?;
 
     for f in ast {
         gen_fn(f, &st, &mut tmp, out, &gen)?;
@@ -46,15 +41,11 @@ fn gen_buildin(
     };
     write!(
         o,
-        "declare {} @{}(",
+        "declare {} @{}(ptr",
         type_conv(ret, st),
         st.original(buildin.0)
     )?;
-    let mut args = args.iter();
-    if let Some(arg) = args.next() {
-        write!(o, "{}", type_conv(arg, st))?;
-    }
-    for arg in args {
+    for arg in args.iter() {
         write!(o, ", {}", type_conv(arg, st))?;
     }
     writeln!(o, ")")?;
@@ -63,9 +54,9 @@ fn gen_buildin(
 
 fn gen_mm_interface(_st: &SymbolTable<String>, o: &mut impl io::Write) -> anyhow::Result<()> {
     writeln!(o, "declare void @store_i64(ptr, i64, i64*)")?;
-    writeln!(o, "declare void @load_i64(ptr, i64*)")?;
+    writeln!(o, "declare i64 @load_i64(ptr, i64*)")?;
     writeln!(o, "declare void @store_i1(ptr, i1, i1*)")?;
-    writeln!(o, "declare void @load_i1(ptr, i1*)")?;
+    writeln!(o, "declare i1 @load_i1(ptr, i1*)")?;
     Ok(())
 }
 
@@ -334,12 +325,8 @@ fn gen_expr(
             } else {
                 Reg::zero().into()
             };
-            write!(o, "call {} @{}(", r#type, st.original(ident))?;
-            let mut params = computed_params.iter();
-            if let Some((r#type, param)) = params.next() {
-                write!(o, "{} {}", type_conv(r#type, st), param)?;
-            }
-            for (r#type, param) in params {
+            write!(o, "call {} @{}(ptr %mm", r#type, st.original(ident))?;
+            for (r#type, param) in computed_params.iter() {
                 write!(o, ", {} {}", type_conv(r#type, st), param)?;
             }
             writeln!(o, ")")?;

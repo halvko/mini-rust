@@ -1,136 +1,15 @@
 use std::{
-    env::args,
+    borrow::Cow,
+    env,
     fs::{self, File},
+    path::Path,
     process,
 };
 
-mod args {
-    use std::path::PathBuf;
-
-    use const_format::formatcp;
-
-    pub(crate) struct Configuration {
-        pub(crate) source_path: PathBuf,
-        pub(crate) out_path: PathBuf,
-        pub(crate) out_name: String,
-        pub(crate) rt_path: PathBuf,
-        pub(crate) target_path: PathBuf,
-        pub(crate) trap_memory_access: bool,
-    }
-
-    const DEFAULT_RT_PATH: &str = "../runtime";
-    const DEFAULT_TARGET_PATH: &str = "../target";
-
-    const TRAP_MEMORY_ACCESS: &str = "trap_memory_access";
-    const OUT: &str = "out";
-    const RT_PATH: &str = "runtime_path";
-
-    pub(crate) fn parse(args: impl Iterator<Item = String>) -> Configuration {
-        let mut args = args.skip(1); // Skip name
-
-        let mut source_path = None;
-        let mut out_path = None;
-        let mut trap_memory_access = true;
-        let mut rt_path = None;
-
-        while let Some(arg) = args.next() {
-            if let Some(arg) = arg.strip_prefix('-') {
-                if let Some(arg) = arg.strip_prefix('-') {
-                    match arg {
-                        TRAP_MEMORY_ACCESS => {
-                            const ERR_IF_MISSING: &str = formatcp!(
-                                "expected boolean argument after \"{TRAP_MEMORY_ACCESS}\""
-                            );
-                            let b = args
-                                .next()
-                                .expect(ERR_IF_MISSING)
-                                .parse::<bool>()
-                                .expect(ERR_IF_MISSING);
-                            trap_memory_access = b;
-                        }
-                        OUT => {
-                            const ERR_IF_MISSING: &str = formatcp!("expected path after \"{OUT}\"");
-                            out_path = Some(PathBuf::from(args.next().expect(ERR_IF_MISSING)));
-                        }
-                        RT_PATH => {
-                            const ERR_IF_MISSING: &str =
-                                formatcp!("expected path after \"{RT_PATH}\"");
-                            rt_path = Some(
-                                PathBuf::from(args.next().expect(ERR_IF_MISSING))
-                                    .canonicalize()
-                                    .unwrap(),
-                            );
-                        }
-                        a => {
-                            panic!("unexpected argument \"--{a}\"")
-                        }
-                    }
-                    continue;
-                }
-                panic!("unexpected argument \"-{arg}\"");
-            }
-            let sp = PathBuf::from(arg.clone())
-                .canonicalize()
-                .unwrap_or_else(|_| panic!("could not canonicalize path to {arg}"));
-            if !sp.is_file() {
-                panic!("expected source path to point to a file")
-            }
-            if sp
-                .extension()
-                .expect("expected input file to have extension \".mr\"")
-                .to_str()
-                .unwrap()
-                != "mr"
-            {
-                panic!("expected input file to have extension \".mr\"")
-            }
-            source_path = Some(sp);
-        }
-        let source_path = source_path.expect("source path");
-        let (out_name, out_path) = if let Some(out_path) = out_path {
-            let file_name = out_path.file_name().unwrap().to_str().unwrap().to_owned();
-            let out_path = {
-                let mut out_base = out_path.parent().unwrap().canonicalize().unwrap();
-                out_base.push(&file_name);
-                out_base
-            };
-
-            (file_name, out_path)
-        } else {
-            (
-                source_path
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_owned(),
-                source_path.with_file_name(source_path.file_stem().unwrap()),
-            )
-        };
-
-        let rt_path = rt_path.unwrap_or_else(|| {
-            PathBuf::from(DEFAULT_RT_PATH.to_owned())
-                .canonicalize()
-                .unwrap()
-        });
-
-        let target_path = PathBuf::from(DEFAULT_TARGET_PATH.to_owned())
-            .canonicalize()
-            .unwrap();
-
-        Configuration {
-            source_path,
-            out_name,
-            out_path,
-            trap_memory_access,
-            rt_path,
-            target_path,
-        }
-    }
-}
+mod args;
 
 fn main() {
-    let config = args::parse(args());
+    let config = args::parse(env::args());
 
     let input = fs::read_to_string(&config.source_path).unwrap();
     let ast = parse::gen_ast(&input).unwrap();
@@ -145,18 +24,33 @@ fn main() {
         &mut llvm_file,
         codegen::Options {
             memory_indirection: config.trap_memory_access,
+            target: &config.target,
         },
     )
     .unwrap();
 
+    let ll_path = config.out_path.with_extension("ll");
     let o_path = config.out_path.with_extension("o");
-    run_and_print_command(process::Command::new("clang").args([
-        "-O2",
-        "-c",
-        "-o",
-        o_path.to_str().unwrap(),
-        ll_path.to_str().unwrap(),
-    ]));
+    let s_path = config.out_path.with_extension("s");
+    let llc_args = LLCArgs {
+        optimize: config.optimize,
+        dest_path: &s_path,
+        ll_path: &ll_path,
+    };
+    run_and_print_command(
+        process::Command::new("llc").args(llc_args.args().iter().map(|a| a.as_ref())),
+    );
+    run_and_print_command(
+        process::Command::new("llc").args(
+            LLCArgs {
+                dest_path: &o_path,
+                ..llc_args
+            }
+            .args()
+            .iter()
+            .map(|a| a.as_ref()),
+        ),
+    );
     let lib_path = config
         .out_path
         .with_file_name(format!("lib{}.a", config.out_name));
@@ -175,7 +69,7 @@ fn main() {
     run_and_print_command(
         process::Command::new("cargo")
             .current_dir(config.rt_path)
-            .env("RUSTFLAGS", "-C target-cpu=native")
+            .env("RUSTFLAGS", format!("--target {}", config.target))
             .args(["b", "-q", "-r"]),
     );
 
@@ -183,6 +77,27 @@ fn main() {
         &format!("{}/release/runtime", config.target_path.to_str().unwrap()),
         config.out_path.to_str().unwrap(),
     ]));
+}
+
+struct LLCArgs<'a> {
+    optimize: bool,
+    dest_path: &'a Path,
+    ll_path: &'a Path,
+}
+
+impl<'a> LLCArgs<'a> {
+    fn args(&self) -> Vec<Cow<'_, str>> {
+        let mut clang_args = Vec::new();
+        clang_args.extend_from_slice(&[
+            "-o".into(),
+            self.dest_path.to_str().unwrap().to_owned().into(),
+        ]);
+        if self.optimize {
+            clang_args.push("-O".into());
+        }
+        clang_args.push(self.ll_path.to_str().unwrap().to_owned().into());
+        clang_args
+    }
 }
 
 fn run_and_print_command(p: &mut process::Command) {

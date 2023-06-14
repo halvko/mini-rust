@@ -22,19 +22,26 @@ impl Display for Label {
     }
 }
 #[allow(clippy::upper_case_acronyms)]
-pub struct LLVM {
+pub struct LLVM<'a> {
     memory_indirection: bool,
+    target_triple: &'a str,
 }
 
-impl From<&crate::Options> for LLVM {
-    fn from(value: &crate::Options) -> Self {
+impl<'a> From<&'a crate::Options<'a>> for LLVM<'a> {
+    fn from(value: &'a crate::Options<'a>) -> Self {
         Self {
             memory_indirection: value.memory_indirection,
+            target_triple: value.target,
         }
     }
 }
 
-impl LLVM {
+impl LLVM<'_> {
+    pub fn initialize_target(&self, o: &mut impl io::Write) -> anyhow::Result<()> {
+        writeln!(o, r#"target triple = "{}""#, self.target_triple)?;
+        Ok(())
+    }
+
     pub fn store<'a, 'b, 'c>(
         &self,
         ty: impl Into<CowType<'a>>,
