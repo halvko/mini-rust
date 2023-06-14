@@ -1,0 +1,9 @@
+fn main() {
+    let a = 0; let b = 100000;
+    let c = loop {
+        if a == b { break true; };
+        if a > b { break false; };
+        a = (a + 1);
+    };
+    output_i1(c);
+}

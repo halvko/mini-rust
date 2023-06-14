@@ -204,6 +204,15 @@ fn gen_expr(
                         writeln!(o, "{tmp} = icmp eq {type} {lhs}, {rhs}",)?;
                         Ok(tmp.into())
                     }
+                    typecheck::Infix::Gt => {
+                        let tmp = t.next_reg();
+                        writeln!(
+                            o,
+                            "{tmp} = icmp {} {type} {lhs}, {rhs}",
+                            if r#type.is_unsigned() { "ugt" } else { "sgt" }
+                        )?;
+                        Ok(tmp.into())
+                    }
                     typecheck::Infix::Assign => unreachable!(),
                 }
             }

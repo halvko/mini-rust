@@ -37,7 +37,7 @@ lte           =  { "<=" }
 gte           =  { ">=" }
 assign        =  { "=" }
 ident         = @{ alpha ~ alpha_numric* }
-alpha         =  { 'a'..'z' | 'A'..'Z' }
+alpha         =  { 'a'..'z' | 'A'..'Z' | "_" }
 alpha_numric  =  { alpha | numric }
 numric        =  { '0'..'9' }
 WHITESPACE    = _{ "\t" | " " | NEWLINE }

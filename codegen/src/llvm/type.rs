@@ -25,8 +25,12 @@ pub struct TypeRef<'a> {
 }
 
 impl TypeRef<'_> {
-    fn is_void(self) -> bool {
+    pub fn is_void(self) -> bool {
         self.name == "void"
+    }
+
+    pub fn is_unsigned(self) -> bool {
+        self.name == "usize"
     }
 }
 
@@ -50,6 +54,9 @@ impl CowType<'_> {
     }
     pub fn is_void(&self) -> bool {
         self.as_ref().is_void()
+    }
+    pub fn is_unsigned(&self) -> bool {
+        self.as_ref().is_unsigned()
     }
 }
 

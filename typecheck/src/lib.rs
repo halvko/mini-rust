@@ -313,6 +313,7 @@ fn tc_expr(
                     (Infix::Add, lhs.r#type.clone())
                 }
                 parse::expression::Infix::Eq => (Infix::Eq, ss.bool.clone()),
+                parse::expression::Infix::Gt => (Infix::Gt, ss.bool.clone()),
                 parse::expression::Infix::Assign => {
                     if let ExpressionKind::Var { .. } = lhs.kind {
                         (Infix::Assign, ss.void.clone())
@@ -320,7 +321,7 @@ fn tc_expr(
                         panic!("trying to assign to general expression")
                     }
                 }
-                _ => todo!("Properly fix operators -.-"),
+                _ => todo!("Encountered {ifx:?} - Properly fix operators -.-"),
             };
             Expression {
                 r#type,
@@ -626,6 +627,7 @@ pub enum Infix {
     Add,
     Eq,
     Assign,
+    Gt,
 }
 
 impl Display for Infix {
@@ -634,6 +636,7 @@ impl Display for Infix {
             Self::Add => f.write_char('+'),
             Self::Assign => f.write_char('='),
             Self::Eq => f.write_str("=="),
+            Self::Gt => f.write_str(">"),
         }
     }
 }
