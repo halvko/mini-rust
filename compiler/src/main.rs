@@ -35,6 +35,7 @@ fn main() {
     let llc_args = LLCArgs {
         optimize: config.optimize,
         dest_path: &s_path,
+        output_type: "asm",
         ll_path: &ll_path,
     };
     run_and_print_command(
@@ -44,6 +45,7 @@ fn main() {
         process::Command::new("llc").args(
             LLCArgs {
                 dest_path: &o_path,
+                output_type: "obj",
                 ..llc_args
             }
             .args()
@@ -82,6 +84,7 @@ fn main() {
 struct LLCArgs<'a> {
     optimize: bool,
     dest_path: &'a Path,
+    output_type: &'static str,
     ll_path: &'a Path,
 }
 
@@ -92,6 +95,7 @@ impl<'a> LLCArgs<'a> {
             "-o".into(),
             self.dest_path.to_str().unwrap().to_owned().into(),
         ]);
+        clang_args.extend_from_slice(&["-filetype".into(), self.output_type.into()]);
         if self.optimize {
             clang_args.push("-O".into());
         }
