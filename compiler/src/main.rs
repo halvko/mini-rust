@@ -97,7 +97,7 @@ impl<'a> LLCArgs<'a> {
         ]);
         clang_args.extend_from_slice(&["-filetype".into(), self.output_type.into()]);
         if self.optimize {
-            clang_args.push("-O".into());
+            clang_args.push("-O2".into());
         }
         clang_args.push(self.ll_path.to_str().unwrap().to_owned().into());
         clang_args

@@ -3,7 +3,6 @@
 use std::{
     hash::{BuildHasher, Hash, Hasher},
     mem::MaybeUninit,
-    time::Instant,
 };
 
 use ahash::HashMapExt;
@@ -134,15 +133,9 @@ impl RuntimeManager {
 }
 
 fn main() {
-    let start = Instant::now();
     let build_hasher = ahash::RandomState::new();
-    let original_hash = build_hasher.build_hasher().finish();
-    println!("Hash without work: {original_hash}");
     let mm = &mut RuntimeManager::new(build_hasher.build_hasher());
-    let time = Instant::now() - start;
-    println!("Setup ran for {}ms", time.as_millis());
 
-    let start = Instant::now();
     let topology = hwlocality::Topology::new().unwrap();
     let cpu_support = topology.feature_support().cpu_binding().unwrap();
 
@@ -162,24 +155,14 @@ fn main() {
     topology
         .bind_thread_cpu(tid, &bind_to, CpuBindingFlags::THREAD)
         .unwrap();
-    let time = Instant::now() - start;
-    println!("Bound thread in {} micros", time.as_micros());
 
-    let start = Instant::now();
     unsafe { mini_defs::mr_main(mm as *mut _ as _) };
-    let time = Instant::now() - start;
-    println!("Ran first run in {} micros", time.as_micros());
 
     let hash = mm.h.finish();
-    println!("{hash}");
 
-    let start = Instant::now();
     mm.restore(&build_hasher);
     mm.persist_side_effects(true);
-    let time = Instant::now() - start;
-    println!("Restored state in {} micros", time.as_micros());
 
-    let start = Instant::now();
     bind_to = cores.next().unwrap().cpuset().unwrap().clone();
 
     bind_to.singlify();
@@ -187,15 +170,9 @@ fn main() {
     topology
         .bind_thread_cpu(tid, &bind_to, CpuBindingFlags::THREAD)
         .unwrap();
-    let time = Instant::now() - start;
-    println!("Bound thread in {} micros", time.as_micros());
 
-    let start = Instant::now();
     unsafe { mini_defs::mr_main(mm as *mut _ as _) };
-    let time = Instant::now() - start;
-    println!("Ran second run in {} micros", time.as_micros());
     let second = mm.h.finish();
-    println!("{second}");
     if second == hash {
         println!("Equal hashes between runs")
     } else {
