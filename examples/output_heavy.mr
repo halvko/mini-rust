@@ -1,9 +1,10 @@
 fn main() {
-    let a = 0; let b = 1000;
+    let a = 0; let b = 100000000;
     let c = loop {
         if a == b { break true; };
         if a > b { break false; };
         a = (a + 1);
+		output_i64(a);
     };
     output_i1(c);
 }

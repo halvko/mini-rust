@@ -242,7 +242,7 @@ pub extern "C" fn alloc(_: *mut RuntimeManager) -> *mut MaybeUninit<i64> {
 /// `ptr` must be a pointer, created by the alloc function in this module, and may not be accessed
 /// in any way after this function returns
 #[no_mangle]
-pub unsafe extern "C" fn free(_: *mut RuntimeManager, ptr: *mut MaybeUninit<i64>) {
+pub unsafe extern "C" fn internal_free(_: *mut RuntimeManager, ptr: *mut MaybeUninit<i64>) {
     drop(unsafe { Box::from_raw(ptr) })
 }
 
